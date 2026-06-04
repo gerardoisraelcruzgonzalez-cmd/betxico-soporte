@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Soporte Betxico</title>
+    <link rel="stylesheet" href="/styles.css?v=20260602d">
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <h1>Admin Soporte Betxico</h1>
+          <p>Configuracion remota de usuarios, canales, listas y columnas Slack.</p>
+        </div>
+        <a class="secondary-button admin-link" href="/" target="_blank" rel="noreferrer">Abrir widget</a>
+      </header>
+
+      <section id="adminLogin" class="form-card admin-login">
+        <h2>Entrar como admin</h2>
+        <label>Correo <input id="adminEmail" type="email" autocomplete="email" placeholder="admin@betxico.mx"></label>
+        <label>PIN <input id="adminPin" type="password" autocomplete="current-password" placeholder="PIN"></label>
+        <button id="adminLoginBtn" type="button">Entrar</button>
+      </section>
+
+      <section id="adminPanel" class="admin-panel" hidden>
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
+              <h2>Opciones del widget</h2>
+              <p>Define que opciones ve el agente y que ruta Slack/Jira usa cada una.</p>
+            </div>
+            <button id="addWorkflowBtn" type="button" class="secondary-button">Agregar opcion</button>
+          </div>
+          <div id="workflowsList" class="admin-list"></div>
+        </section>
+
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
+              <h2>Usuarios autorizados</h2>
+              <p>Solo los correos activos pueden iniciar sesion y usar la app.</p>
+            </div>
+            <button id="addUserBtn" type="button" class="secondary-button">Agregar usuario</button>
+          </div>
+          <div id="usersList" class="admin-list"></div>
+        </section>
+
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
+              <h2>Alertas para agentes</h2>
+              <p>Publica avisos bloqueantes que el agente debe marcar como vistos antes de seguir usando la app.</p>
+            </div>
+            <button id="addAlertBtn" type="button" class="secondary-button">Agregar alerta</button>
+          </div>
+          <div id="alertsList" class="admin-list"></div>
+        </section>
+
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
+              <h2>Rutas Slack</h2>
+              <p>Cada ruta define a que canal y lista se reporta cada tipo de ticket.</p>
+            </div>
+            <button id="addRouteBtn" type="button" class="secondary-button">Agregar ruta</button>
+          </div>
+          <div id="routesList" class="admin-list"></div>
+        </section>
+
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
+              <h2>Entrenamiento GPT</h2>
+              <p>Define instrucciones, base documental y ejemplos aprobados para el asistente.</p>
+            </div>
+            <button id="addAiExampleBtn" type="button" class="secondary-button">Agregar ejemplo</button>
+          </div>
+          <div class="admin-ai-grid">
+            <label class="span-2">Instrucciones base
+              <textarea id="aiBaseInstructions" rows="5"></textarea>
+            </label>
+            <label>Contexto del negocio
+              <textarea id="aiBusinessContext" rows="5"></textarea>
+            </label>
+            <label>Reglas de tono
+              <textarea id="aiToneRules" rows="5"></textarea>
+            </label>
+            <label>Reglas de seguridad
+              <textarea id="aiSafetyRules" rows="5"></textarea>
+            </label>
+            <label>Formato de respuesta
+              <textarea id="aiDefaultResponseFormat" rows="5"></textarea>
+            </label>
+            <label>Vector Store ID
+              <input id="aiVectorStoreId" type="text" placeholder="vs_...">
+            </label>
+            <label>Max. ejemplos por consulta
+              <input id="aiMaxExamples" type="number" min="1" max="8">
+            </label>
+            <label>Max. resultados File Search
+              <input id="aiFileSearchMaxResults" type="number" min="1" max="8">
+            </label>
+            <label class="check-field"><input id="aiEnabled" type="checkbox"> Asistente activo</label>
+          </div>
+          <div id="aiExamplesList" class="admin-list"></div>
+        </section>
+
+        <div class="admin-actions">
+          <button id="saveAdminConfigBtn" type="button">Guardar cambios remotos</button>
+          <button id="reloadAdminConfigBtn" type="button" class="secondary-button">Recargar</button>
+        </div>
+      </section>
+
+      <section id="adminStatus" class="result" hidden></section>
+    </main>
+
+    <script type="module" src="/admin.js?v=20260602d"></script>
+  </body>
+</html>

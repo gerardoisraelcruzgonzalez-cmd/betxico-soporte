@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Soporte Betxico</title>
+    <link rel="stylesheet" href="/styles.css?v=20260602c">
+  </head>
+  <body data-auth="loading">
+    <main class="app-shell">
+      <header class="header">
+        <div class="header-title">
+          <span class="app-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M8.5 12.4 12.4 8.5a2.6 2.6 0 0 1 3.7 3.7l-3.9 3.9a2.6 2.6 0 0 1-3.7-3.7Z"></path>
+              <path d="m9.9 10.9 3.2 3.2"></path>
+              <path d="M7.6 4.8h8.8l2.8 2.8v8.8l-2.8 2.8H7.6l-2.8-2.8V7.6l2.8-2.8Z"></path>
+            </svg>
+          </span>
+          <div>
+            <h1 id="screenTitle">Iniciar sesión</h1>
+            <p id="screenSubtitle">Acceso al centro de tickets</p>
+          </div>
+        </div>
+        <nav id="listPanelTabs" class="list-panel-tabs" aria-label="Listas de Slack"></nav>
+        <div class="header-actions">
+          <span id="connectionState" class="status">Cargando</span>
+          <button id="settingsTab" type="button" class="header-button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z"></path>
+              <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1-2 3.4-.2-.1a1.6 1.6 0 0 0-1.8.3l-.7.4a1.6 1.6 0 0 0-1 1.5v.2h-4v-.2a1.6 1.6 0 0 0-1-1.5l-.7-.4a1.6 1.6 0 0 0-1.8-.3l-.2.1-2-3.4.1-.1a1.6 1.6 0 0 0 .3-1.8v-.8a1.6 1.6 0 0 0-1.2-1.4l-.2-.1v-4l.2-.1a1.6 1.6 0 0 0 1.2-1.4v-.8a1.6 1.6 0 0 0-.3-1.8l-.1-.1 2-3.4.2.1a1.6 1.6 0 0 0 1.8-.3l.7-.4a1.6 1.6 0 0 0 1-1.5V.8h4V1a1.6 1.6 0 0 0 1 1.5l.7.4a1.6 1.6 0 0 0 1.8.3l.2-.1 2 3.4-.1.1a1.6 1.6 0 0 0-.3 1.8v.8a1.6 1.6 0 0 0 1.2 1.4l.2.1v4l-.2.1a1.6 1.6 0 0 0-1.2 1.4Z"></path>
+            </svg>
+            CONFIGURACIÓN
+          </button>
+        </div>
+      </header>
+
+      <section id="listPanelWidget" class="list-panel-widget" hidden></section>
+
+      <button id="ticketTab" type="button" class="back-button">VOLVER AL BUSCADOR</button>
+
+      <section class="customer-panel is-hidden">
+        <label>
+          Cliente
+          <input id="customerName" type="text" autocomplete="off" placeholder="Sin nombre">
+        </label>
+        <label>
+          Correo
+          <input id="customerEmail" type="email" autocomplete="off" placeholder="correo@cliente.com">
+        </label>
+        <label>
+          AUTH ID
+          <input id="authId" type="text" autocomplete="off" placeholder="ID Autenticacion">
+        </label>
+        <label>
+          Chat ID
+          <input id="chatId" type="text" autocomplete="off" placeholder="Sin chat activo">
+        </label>
+      </section>
+
+      <section id="searchView" class="search-view app-view active">
+        <section class="quick-actions form-card" aria-labelledby="quickActionsTitle">
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </span>
+            <div>
+              <h2 id="quickActionsTitle">Acciones rápidas</h2>
+              <p>Envía reportes directos a los canales operativos de Slack.</p>
+            </div>
+          </div>
+          <div class="quick-action-grid">
+            <button id="quickDepositBtn" type="button" class="quick-action-button">
+              <span class="quick-action-icon" aria-hidden="true">$</span>
+              Deposito no reflejado
+            </button>
+          </div>
+          <form id="quickDepositForm" class="quick-deposit-form" hidden>
+            <div class="quick-deposit-preview" id="quickDepositPreview"></div>
+            <label>
+              <span class="field-label">Clave de rastreo</span>
+              <input id="quickDepositTrackingKey" type="text" autocomplete="off" placeholder="Clave de rastreo">
+            </label>
+            <label>
+              <span class="field-label">Monto</span>
+              <input id="quickDepositAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="$0.00">
+            </label>
+            <div id="quickDepositEvidence" class="quick-evidence-zone" tabindex="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 16V4"></path>
+                <path d="m7 9 5-5 5 5"></path>
+                <path d="M20 16.5a4 4 0 0 1-4 4H8a4 4 0 0 1-1-7.9A5.5 5.5 0 0 1 17.7 10 4.5 4.5 0 0 1 20 16.5Z"></path>
+              </svg>
+              <strong>Pega aquí la evidencia</strong>
+              <span>Haz clic, pega con Cmd/Ctrl+V, arrastra o selecciona archivo.</span>
+            </div>
+            <div id="quickDepositAttachmentList" class="attachment-list quick-attachment-list"></div>
+            <div class="quick-deposit-actions">
+              <button id="quickDepositCancelBtn" type="button" class="secondary-button">Cancelar</button>
+              <button id="quickDepositSubmitBtn" type="submit">Crear ticket y enviar</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="aiAssistantPanel" class="ai-assistant form-card" aria-labelledby="aiAssistantTitle" hidden>
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z"></path><path d="M12 8v8"></path><path d="M8.5 10.5 12 8l3.5 2.5"></path><path d="M8.5 13.5 12 16l3.5-2.5"></path></svg>
+            </span>
+            <div>
+              <h2 id="aiAssistantTitle">Asistente GPT</h2>
+              <p>Consulta dudas operativas, redacta respuestas o resume el caso activo.</p>
+            </div>
+          </div>
+          <form id="aiChatForm" class="ai-chat-form">
+            <label class="ai-input-label">
+              <span class="field-label">Consulta</span>
+              <textarea id="aiChatInput" rows="4" placeholder="Ej. Redacta una respuesta para pedir CEP y clave de rastreo al cliente..."></textarea>
+            </label>
+            <div class="ai-chat-actions">
+              <button id="aiAskBtn" type="submit">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"></path><path d="m22 2-7 20-4-9-9-4 20-7Z"></path></svg>
+                CONSULTAR
+              </button>
+              <button id="aiCopyBtn" type="button" class="secondary-button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8z"></path><path d="M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1"></path></svg>
+                COPIAR
+              </button>
+              <button id="aiClearBtn" type="button" class="secondary-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                LIMPIAR
+              </button>
+              <button id="aiSaveGoodBtn" type="button" class="secondary-button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m20 6-11 11-5-5"></path></svg>
+                BUENA
+              </button>
+              <button id="aiBadBtn" type="button" class="secondary-button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="m10.3 3.9-8.1 14A2 2 0 0 0 3.9 21h16.2a2 2 0 0 0 1.7-3.1l-8.1-14a2 2 0 0 0-3.4 0Z"></path></svg>
+                INCORRECTA
+              </button>
+            </div>
+          </form>
+        </section>
+        <div id="aiChatOutput" class="ai-chat-output" hidden></div>
+
+        <section id="liveChatAutomationPanel" class="livechat-automation form-card" aria-labelledby="liveChatAutomationTitle" hidden>
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6a8 8 0 1 1 18-5Z"></path><path d="M8 10h8"></path><path d="M8 14h5"></path></svg>
+            </span>
+            <div>
+              <h2 id="liveChatAutomationTitle">LiveChat asistido</h2>
+              <p>Prueba controlada: bienvenida automática al tomar un chat.</p>
+            </div>
+          </div>
+          <div class="livechat-welcome-preview" id="liveChatWelcomePreview"></div>
+          <div class="livechat-actions">
+            <button id="sendWelcomeBtn" type="button" class="secondary-button">ENVIAR BIENVENIDA</button>
+            <span id="liveChatAutomationStatus">Esperando chat activo.</span>
+          </div>
+        </section>
+
+        <form id="searchForm" class="search-card form-card">
+          <div class="search-hero-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M10.8 18.6a7.8 7.8 0 1 1 0-15.6 7.8 7.8 0 0 1 0 15.6Z"></path><path d="m16.5 16.5 4.5 4.5"></path></svg>
+          </div>
+          <h2>Buscar ticket</h2>
+          <p>Encuentra tickets por AUTH ID, correo, nombre, resumen, descripción o cualquier palabra clave.</p>
+          <label class="search-input-label">
+            <span class="is-hidden">Buscar ticket</span>
+            <input id="ticketSearchInput" type="search" autocomplete="off" placeholder="Ej. correo, AUTH ID, Jira, Slack o retiro no reflejado...">
+            <button id="clearSearchBtn" type="button" class="icon-button" aria-label="Limpiar búsqueda">
+              <svg viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            </button>
+          </label>
+          <button id="searchTicketBtn" type="submit" class="search-submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 18.6a7.8 7.8 0 1 1 0-15.6 7.8 7.8 0 0 1 0 15.6Z"></path><path d="m16.5 16.5 4.5 4.5"></path></svg>
+            BUSCAR TICKET
+          </button>
+          <div id="searchResults" class="search-results"></div>
+        </form>
+
+        <section class="create-ticket-card form-card">
+          <div class="search-hero-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5V10a2 2 0 0 0 0 4v2.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5V14a2 2 0 0 0 0-4V7.5Z"></path><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+          </div>
+          <h2>¿No existe el ticket?</h2>
+          <p>Crea una nueva incidencia y nuestro equipo de soporte dará seguimiento.</p>
+          <button id="newTicketBtn" type="button" class="create-ticket-button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+            CREAR TICKET
+          </button>
+        </section>
+
+        <p class="privacy-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.9 8.5 7 10 4.1-1.5 7-5.5 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-5"></path></svg>
+          Utiliza el buscador para encontrar tickets existentes o crea uno nuevo si el cliente aún no tiene una incidencia registrada.
+        </p>
+      </section>
+
+      <form id="ticketForm" class="ticket-form app-view">
+        <section class="form-card" aria-labelledby="caseInfoTitle">
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M8 4h6l4 4v12H8V4Z"></path><path d="M14 4v5h5"></path><path d="M10.5 13h5"></path><path d="M10.5 16h4"></path></svg>
+            </span>
+            <h2 id="caseInfoTitle">Información del ticket</h2>
+          </div>
+          <div class="section-grid">
+            <label>
+              <span class="field-label">Tipo de reporte <span class="required">*</span></span>
+              <select id="ticketDestination" required>
+                <option value="deposito-no-reflejado">Deposito no reflejado</option>
+                <option value="cierre-sesiones">Cierre de sesiones</option>
+                <option value="jira">Jira</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Categoría <span class="required">*</span></span>
+              <select id="issueType" required>
+                <option value="">Cargando tipos de Jira...</option>
+              </select>
+            </label>
+            <div id="caseFields" class="section-grid nested-grid"></div>
+            <div id="slackFields" class="section-grid nested-grid slack-fields" hidden>
+              <label id="slackAgentField" class="jira-field">
+                <span class="field-label">Agente <span class="required">*</span></span>
+                <input id="slackAgentName" type="text" placeholder="Patricio Maldonado">
+              </label>
+              <label id="slackCustomerIdField" class="jira-field">
+                <span class="field-label">ID <span class="required">*</span></span>
+                <input id="slackCustomerId" type="text" placeholder="425075">
+              </label>
+              <label id="slackCustomerEmailField" class="jira-field">
+                <span class="field-label">Correo <span class="required">*</span></span>
+                <input id="slackCustomerEmail" type="email" placeholder="cliente@correo.com">
+              </label>
+              <label id="slackGameField" class="jira-field">
+                <span class="field-label">Juego <span class="required">*</span></span>
+                <input id="slackGame" type="text" placeholder="Nombre del juego">
+              </label>
+              <label id="slackTrackingKeyField" class="jira-field">
+                <span class="field-label">Clave de rastreo <span class="required">*</span></span>
+                <input id="slackTrackingKey" type="text" placeholder="NU3A2KUAKOI4892Q8M1JFE5B8KBU">
+              </label>
+              <label id="slackAmountField" class="jira-field">
+                <span class="field-label">Monto <span class="required">*</span></span>
+                <input id="slackAmount" type="text" placeholder="20.00">
+              </label>
+              <label id="slackDetailField" class="jira-field span-2">
+                <span class="field-label">Detalle</span>
+                <textarea id="slackDetail" rows="4" placeholder="Describe el deposito no reflejado y la evidencia disponible."></textarea>
+              </label>
+              <div id="slackMessagePreviewField" class="slack-message-preview span-2">
+                <strong>Mensaje Slack</strong>
+                <pre id="slackMessagePreview"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section id="jiraDetailsSection" class="attachments-panel form-card" aria-labelledby="detailTitle">
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6a8 8 0 1 1 18-5Z"></path></svg>
+            </span>
+            <div>
+              <h2 id="detailTitle">Descripción y evidencias</h2>
+              <p>Describe el caso y adjunta la evidencia disponible.</p>
+            </div>
+          </div>
+          <div id="jiraFields" class="jira-fields"></div>
+          <div class="attachments-header">
+            <div class="section-heading">
+              <span class="section-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m21 11.5-8.7 8.7a5.2 5.2 0 0 1-7.4-7.4l9-9a3.5 3.5 0 0 1 5 5l-9 9a1.8 1.8 0 0 1-2.5-2.5l8.3-8.3"></path></svg>
+              </span>
+              <div>
+                <h3>Enviar evidencias</h3>
+                <p>Adjunta capturas, comprobantes o cualquier evidencia relacionada con el caso.</p>
+              </div>
+            </div>
+            <button id="addAttachmentBtn" type="button" class="secondary-button">AGREGAR ARCHIVO</button>
+          </div>
+          <input id="attachmentInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" multiple hidden>
+          <div id="attachmentDropzone" class="attachment-dropzone">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 16V4"></path>
+              <path d="m7 9 5-5 5 5"></path>
+              <path d="M20 16.5a4 4 0 0 1-4 4H8a4 4 0 0 1-1-7.9A5.5 5.5 0 0 1 17.7 10 4.5 4.5 0 0 1 20 16.5Z"></path>
+            </svg>
+            <strong>Arrastra archivos aquí, pega una captura o haz clic para subir</strong>
+            <span>JPG, PNG, PDF o imagen copiada al portapapeles. Máx. 10 MB por archivo.</span>
+          </div>
+          <div id="attachmentList" class="attachment-list"></div>
+        </section>
+
+        <div class="form-actions">
+          <button id="clearBtn" type="button" class="secondary-button danger-light">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6"></path><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path></svg>
+            LIMPIAR FORMULARIO
+          </button>
+          <button id="submitBtn" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 12.4 12.4 8.5a2.6 2.6 0 0 1 3.7 3.7l-3.9 3.9a2.6 2.6 0 0 1-3.7-3.7Z"></path><path d="m9.9 10.9 3.2 3.2"></path></svg>
+            CREAR TICKET
+          </button>
+        </div>
+        <p class="privacy-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.9 8.5 7 10 4.1-1.5 7-5.5 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-5"></path></svg>
+          La información proporcionada es confidencial y será utilizada únicamente para la atención de esta incidencia.
+        </p>
+      </form>
+
+      <section id="settingsView" class="settings-view app-view">
+        <div class="login-intro-scene" aria-hidden="true">
+          <img class="login-intro-frame intro-frame intro-frame-1a" src="/assets/intro-login-fixed/field-fixed-1.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-2a" src="/assets/intro-login-fixed/field-fixed-2-error.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-1b" src="/assets/intro-login-fixed/field-fixed-1.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-2b" src="/assets/intro-login-fixed/field-fixed-2-error.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-1c" src="/assets/intro-login-fixed/field-fixed-1.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-3" src="/assets/intro-login-fixed/field-fixed-3-hit.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-4" src="/assets/intro-login-fixed/field-fixed-4-ready.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-5" src="/assets/intro-login-fixed/field-fixed-5-ready-hand.png" alt="">
+          <img class="login-intro-frame intro-frame intro-frame-6" src="/assets/intro-login-fixed/field-fixed-6-ready-hand-login-bg.png" alt="">
+          <div class="login-intro-shade"></div>
+        </div>
+        <form id="loginForm" class="settings-form settings-card-simple login-card">
+          <h2>Conéctate con Slack</h2>
+          <p class="settings-note span-2">Accede al centro de tickets con tu sesión autorizada.</p>
+          <button id="slackLoginBtn" type="button" class="slack-login-button span-2">
+            <span class="slack-mark" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </span>
+            INICIAR SESIÓN CON SLACK
+          </button>
+          <div class="login-divider span-2"><span>o</span></div>
+          <details class="advanced-settings span-2" open>
+            <summary>Usar correo electrónico y PIN</summary>
+            <div class="advanced-settings-grid">
+              <label>
+                Correo
+                <input id="loginEmail" type="email" autocomplete="email" placeholder="agente@betxico.mx">
+              </label>
+              <label>
+                PIN
+                <input id="loginPin" type="password" autocomplete="current-password" placeholder="PIN">
+              </label>
+              <button id="loginBtn" type="submit" class="span-2">Entrar con PIN</button>
+            </div>
+          </details>
+        </form>
+
+        <form id="accountForm" class="settings-form settings-card-simple" hidden>
+          <h2>Configuración de cuenta</h2>
+          <p class="settings-note span-2">Tu sesión se controla con Slack. Para crear y comentar en Jira, pega tu token personal.</p>
+          <label>
+            Nombre
+            <input id="accountDisplayName" type="text" autocomplete="name" placeholder="Nombre del agente">
+          </label>
+          <label>
+            Correo Slack
+            <input id="accountEmail" type="email" autocomplete="email" placeholder="agente@betxico.mx" readonly>
+          </label>
+          <label>
+            Correo Jira
+            <input id="jiraEmail" type="email" autocomplete="off" placeholder="agente@betxico.mx">
+          </label>
+          <label>
+            Token de Jira
+            <input id="jiraApiToken" type="password" autocomplete="off" placeholder="Pega tu token de Jira">
+          </label>
+          <details class="advanced-settings span-2">
+            <summary>Ajustes avanzados</summary>
+            <div class="advanced-settings-grid">
+              <div class="span-2 slack-user-panel">
+                <button id="slackUserConnectBtn" type="button" class="secondary-button">Conectar Slack para publicar</button>
+                <p id="slackUserStatus" class="settings-note">Opcional. Si no lo conectas, los mensajes al canal saldrán con el bot.</p>
+              </div>
+              <label>
+                PIN de respaldo
+                <input id="accountPin" type="password" autocomplete="new-password" placeholder="Nuevo PIN opcional">
+              </label>
+              <label>
+                Informador
+                <select id="reporterAccountId"></select>
+              </label>
+              <label>
+                Asignado por default
+                <select id="defaultAssigneeAccountId"></select>
+              </label>
+              <label class="span-2">
+                Etiquetas default
+                <input id="defaultLabels" type="text" autocomplete="off" placeholder="livechat soporte servicio_cliente">
+              </label>
+            </div>
+          </details>
+          <div class="settings-actions span-2">
+            <button id="saveAccountBtn" type="submit">Guardar configuración</button>
+            <button id="logoutBtn" type="button" class="secondary-button">Cerrar sesión</button>
+          </div>
+        </form>
+
+        <form id="adminConfigForm" class="settings-form settings-card-simple span-2" hidden>
+          <details class="advanced-settings span-2">
+            <summary>Administración remota</summary>
+            <p class="settings-note">Canales, listas, columnas y usuarios se editan desde el panel remoto del backend.</p>
+            <div class="settings-actions">
+              <a class="secondary-button admin-link" href="/admin.html" target="_blank" rel="noreferrer">Abrir panel remoto</a>
+              <button id="reloadSupportConfigBtn" type="button" class="secondary-button">Recargar permisos</button>
+            </div>
+          </details>
+        </form>
+      </section>
+
+      <section id="result" class="result" hidden></section>
+    </main>
+
+    <section id="agentAlertOverlay" class="agent-alert-overlay" hidden>
+      <article class="agent-alert-card" role="dialog" aria-modal="true" aria-labelledby="agentAlertTitle">
+        <div id="agentAlertSeverity" class="agent-alert-severity">Aviso operativo</div>
+        <h2 id="agentAlertTitle">Alerta</h2>
+        <p id="agentAlertMessage"></p>
+        <button id="agentAlertAckBtn" type="button">Ya lo vi</button>
+      </article>
+    </section>
+
+    <script src="https://unpkg.com/@livechat/agent-app-sdk@1.15.0/dist/agentapp.umd.min.js"></script>
+    <script type="module" src="/app.js?v=20260602b"></script>
+  </body>
+</html>

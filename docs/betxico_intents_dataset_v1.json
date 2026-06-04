@@ -1,0 +1,1881 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-06-04T15:57:59.909Z",
+  "project": "Betxico Soporte",
+  "description": "Indice operativo de intents universales para clasificar casos de soporte, detectar subdiagnosticos, evitar respuestas duplicadas y seleccionar ejemplos aprobados relevantes. Este JSON no reemplaza File Search; se usa para decision rapida y deduplicacion.",
+  "rules": [
+    "Consultar primero este indice para clasificar el intent universal antes de redactar.",
+    "No crear nuevos diagnosticos si el caso puede pertenecer a un intent universal existente.",
+    "Usar subdiagnosticos y variantes para evitar duplicidad.",
+    "No incluir nombres de clientes en respuestas universales.",
+    "No prometer tiempos exactos cuando dependa de banco, proveedor, area interna, validacion documental o revision tecnica.",
+    "No inventar causas no confirmadas por sistema o por el area responsable.",
+    "No prometer bonos, reposiciones, pagos, aprobaciones ni acreditaciones sin validacion.",
+    "Si faltan datos minimos, pedir solo los necesarios para avanzar.",
+    "Si el cliente esta molesto, reconocer la molestia sin aceptar responsabilidad falsa ni prometer solucion inmediata.",
+    "Usar File Search MD para conocimiento profundo, ejemplos aprobados KV para estilo/casos reales y contexto del chat para datos actuales del caso."
+  ],
+  "intents": [
+    {
+      "intent": "acceso_cambio_password_pedir_captura",
+      "category": "acceso_cuenta",
+      "subcategory": "recuperacion_password",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para recuperacion_password.",
+      "triggers": [
+        "no puedo entrar",
+        "contraseña temporal",
+        "me rechaza la contraseña",
+        "cambiar contraseña",
+        "recuperar contraseña"
+      ],
+      "subdiagnostics": [
+        "recuperacion_password"
+      ],
+      "requiredData": [
+        "correo registrado",
+        "captura del error en login",
+        "dispositivo o navegador"
+      ],
+      "responseRules": [
+        "el cliente no puede iniciar sesion",
+        "el problema es credencial o login",
+        "no hay bloqueo confirmado",
+        "no enviar contraseñas reales en plantillas",
+        "no exponer datos de cuenta",
+        "validar titularidad si se cambia acceso"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "cuenta bloqueada por seguridad",
+        "KYC delicado",
+        "autoexclusion o cierre definitivo"
+      ],
+      "baseResponse": "Para ayudarte con el acceso, por favor enviame una captura del area de inicio de sesion donde se vea el correo que estas usando y el mensaje de error. Con eso validamos si el problema viene de la contraseña, el correo o la sesion.",
+      "angryCustomerResponse": "Entiendo que es molesto no poder entrar. Para revisar el acceso correctamente necesito una captura del login con el correo usado y el mensaje de error. Asi evitamos darte una indicacion incorrecta.",
+      "internalRecommendation": "no enviar contraseñas reales en plantillas no exponer datos de cuenta validar titularidad si se cambia acceso",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "acceso_enlace_externo_navegador_integrado",
+      "category": "acceso_cuenta",
+      "subcategory": "navegador_externo",
+      "priority": "medium",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para navegador_externo.",
+      "triggers": [
+        "facebook",
+        "instagram",
+        "enlace externo",
+        "navegador integrado",
+        "no carga",
+        "se cierra sesion"
+      ],
+      "subdiagnostics": [
+        "navegador_externo"
+      ],
+      "requiredData": [
+        "navegador usado",
+        "dispositivo",
+        "captura del error"
+      ],
+      "responseRules": [
+        "el cliente abre desde app externa",
+        "hay error de carga o sesion",
+        "no hay bloqueo confirmado",
+        "no asumir bloqueo",
+        "pedir captura si persiste",
+        "reclasificar si afecta retiro o KYC"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "error aparece tambien en Chrome/Safari",
+        "hay bloqueo de cuenta",
+        "hay problema de pagos o retiro"
+      ],
+      "baseResponse": "Por favor cierra esa ventana y abre Betxico directamente desde Google Chrome o Safari escribiendo betxico.mx en la barra del navegador. Los enlaces abiertos desde Facebook, Instagram u otros navegadores integrados pueden generar errores de sesion o carga.",
+      "angryCustomerResponse": "Entiendo que el error es incomodo. Para descartar que venga del navegador integrado, abre Betxico directamente desde Chrome o Safari escribiendo betxico.mx. Si el problema continua desde ahi, envianos captura del error.",
+      "internalRecommendation": "no asumir bloqueo pedir captura si persiste reclasificar si afecta retiro o KYC",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "bono_10_casino_activacion",
+      "category": "bonos",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "description": "Consulta sobre promocion 10% extra casino que requiere deposito minimo y activacion desde Promociones antes de jugar.",
+      "triggers": [
+        "bono 10 casino",
+        "10% extra",
+        "activar promocion",
+        "deposite 250",
+        "jugue antes de activar",
+        "bono 10%",
+        "10 casino",
+        "promocion 10",
+        "activar bono",
+        "bono en depositos arriba de 250"
+      ],
+      "subdiagnostics": [
+        "deposito_minimo_250",
+        "activacion_desde_promociones",
+        "uso_saldo_antes_de_activar",
+        "promocion_no_aplicable_al_deposito",
+        "bono_10_casino"
+      ],
+      "requiredData": [
+        "monto del deposito",
+        "si activo promocion antes de jugar",
+        "si uso saldo antes de activar",
+        "promocion vigente en cuenta",
+        "monto depositado",
+        "si el bono fue activado antes de jugar",
+        "si el saldo ya fue usado"
+      ],
+      "responseRules": [
+        "Indicar deposito minimo de $250 MXN.",
+        "Explicar que debe activarse desde Promociones.",
+        "Aclarar que usar saldo antes de activar puede impedir aplicacion.",
+        "No prometer activacion retroactiva.",
+        "el cliente pregunta como activar bono 10%",
+        "el deposito cumple monto minimo",
+        "el cliente aun no jugo con el saldo",
+        "no activar si el cliente ya jugo",
+        "no prometer aplicacion retroactiva",
+        "validar monto minimo"
+      ],
+      "forbiddenPhrases": [
+        "te lo activo aunque ya jugaste",
+        "se aplica automatico",
+        "te lo damos retroactivo",
+        "no importan las reglas",
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "Consulta bono de primer deposito.",
+        "Consulta bono gratis por registro.",
+        "Cliente pide bono no disponible.",
+        "el cliente ya jugo antes de activar",
+        "el deposito no cumple monto minimo",
+        "no aparece promocion aplicable"
+      ],
+      "baseResponse": "Para activar la promocion del 10% en casino, es necesario realizar un deposito minimo de $250 pesos y despues activar el bono desde el apartado de Promociones. Es importante que el bono se active antes de jugar o apostar, ya que si el saldo se usa antes de activar la promocion, el beneficio ya no podra aplicarse sobre ese deposito.",
+      "angryCustomerResponse": "Entendemos tu molestia. La promocion del 10% en casino requiere deposito minimo de $250 pesos y activacion desde Promociones antes de jugar o apostar. Si el saldo se uso antes de activar la promocion, el beneficio puede dejar de aplicar sobre ese deposito conforme a las reglas de la promocion.",
+      "internalRecommendation": "Revisar historial de deposito, activacion y primer uso del saldo antes de confirmar rechazo o elegibilidad.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "bono_primer_deposito",
+        "retiro_saldo_restringido_bono_rollover",
+        "bono_no_disponible"
+      ],
+      "subcategory": "bono_10_casino",
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "bono_no_disponible",
+      "category": "bonos",
+      "priority": "medium",
+      "riskLevel": "low",
+      "description": "Cliente pide bono, cashback, freebet, lealtad, cumpleaños, referidos o beneficio no disponible o no confirmado para su cuenta.",
+      "triggers": [
+        "bono de cumpleaños",
+        "cashback",
+        "freebet",
+        "bono de lealtad",
+        "bono especial",
+        "referidos"
+      ],
+      "subdiagnostics": [
+        "cumpleanos_no_disponible",
+        "cashback_no_disponible",
+        "freebet_casino_no_disponible",
+        "lealtad_no_disponible",
+        "referidos_sin_campana_confirmada"
+      ],
+      "requiredData": [
+        "tipo de bono solicitado",
+        "si existe campana activa confirmada",
+        "promociones visibles en cuenta"
+      ],
+      "responseRules": [
+        "Informar que no esta disponible para su cuenta.",
+        "No ofrecer escalamiento para obtener bono.",
+        "Remitir a Promociones si se activa una promocion aplicable.",
+        "No crear promesas de beneficios futuros."
+      ],
+      "forbiddenPhrases": [
+        "te lo escalo para que te den bono",
+        "ese bono si te lo damos",
+        "te damos cashback",
+        "te damos bono por actividad"
+      ],
+      "doNotUseWhen": [
+        "Existe campana activa confirmada.",
+        "Consulta bono primer deposito.",
+        "Consulta promocion 10% casino."
+      ],
+      "baseResponse": "Por el momento no contamos con ese tipo de bono o beneficio disponible para tu cuenta. Si en el futuro se activa alguna promocion aplicable, podras verla directamente desde el apartado de Promociones dentro de tu cuenta.",
+      "angryCustomerResponse": "Entendemos que esperabas un beneficio adicional. Por el momento no contamos con ese tipo de bono o promocion disponible para tu cuenta, por lo que no podemos prometerlo ni escalarlo como excepcion. Si se activa alguna promocion aplicable, aparecera directamente en el apartado de Promociones.",
+      "internalRecommendation": "No abrir ticket para bonos no disponibles salvo que exista evidencia de promocion activa mal aplicada.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [
+        "bono_primer_deposito",
+        "bono_no_existe_por_registro",
+        "bono_10_casino_activacion"
+      ]
+    },
+    {
+      "intent": "bono_no_existe_por_registro",
+      "category": "bonos",
+      "priority": "medium",
+      "riskLevel": "low",
+      "description": "Cliente afirma que existe dinero gratis o bono solo por registrarse, instalar o crear cuenta.",
+      "triggers": [
+        "bono por registro",
+        "dinero gratis",
+        "me prometieron bono por instalar",
+        "solo cree cuenta",
+        "bono sin deposito"
+      ],
+      "subdiagnostics": [
+        "registro_sin_deposito",
+        "instalacion_app_sin_bono",
+        "promesa_no_confirmada",
+        "confusion_con_bono_primer_deposito"
+      ],
+      "requiredData": [
+        "si realizo deposito",
+        "monto del deposito",
+        "promocion que menciona",
+        "captura de oferta si existe"
+      ],
+      "responseRules": [
+        "Aclarar que no hay bono gratis solo por registro.",
+        "Redirigir a bono de primer deposito si aplica.",
+        "No ofrecer excepciones.",
+        "No escalar para otorgar bono no disponible."
+      ],
+      "forbiddenPhrases": [
+        "te lo damos por esta vez",
+        "te lo escalo para que te den bono",
+        "si hay bono gratis",
+        "te agregamos saldo sin deposito"
+      ],
+      "doNotUseWhen": [
+        "Si el cliente pregunta por primer deposito real.",
+        "Si el cliente pregunta por promocion 10% casino.",
+        "Si existe campana activa confirmada distinta."
+      ],
+      "baseResponse": "Actualmente no contamos con bono gratuito solo por registrarse o instalar la aplicacion. La promocion vigente aplica realizando tu primer deposito de $100 pesos en adelante. Por ese motivo, si unicamente creaste tu cuenta, no es posible otorgar el bono sin deposito.",
+      "angryCustomerResponse": "Entendemos la confusion. Por el momento no existe un bono gratuito solo por registrarse o instalar la aplicacion. La promocion vigente aplica con el primer deposito de $100 pesos en adelante, por lo que no es posible otorgar saldo o bono sin deposito confirmado.",
+      "internalRecommendation": "Si el cliente muestra captura de oferta externa, revisar origen antes de responder algo adicional.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [
+        "bono_primer_deposito",
+        "bono_no_disponible"
+      ]
+    },
+    {
+      "intent": "bono_primer_deposito",
+      "category": "bonos",
+      "priority": "medium",
+      "riskLevel": "low",
+      "description": "Consulta sobre bono vigente de primer deposito, aplicable cuando el primer deposito es de $100 MXN en adelante.",
+      "triggers": [
+        "bono primer deposito",
+        "bono de 100",
+        "primer deposito",
+        "como activo bono",
+        "promocion bienvenida"
+      ],
+      "subdiagnostics": [
+        "primer_deposito_pendiente",
+        "primer_deposito_confirmado",
+        "monto_minimo_100",
+        "bono_bienvenida"
+      ],
+      "requiredData": [
+        "si es primer deposito",
+        "monto del deposito",
+        "si el deposito fue confirmado",
+        "promocion vigente"
+      ],
+      "responseRules": [
+        "Explicar que aplica solo al primer deposito.",
+        "Indicar monto minimo de $100 MXN.",
+        "No prometer bono si no se confirma deposito.",
+        "No aplicar si ya tuvo primer deposito previo."
+      ],
+      "forbiddenPhrases": [
+        "te lo damos aunque ya depositaste",
+        "se activa sin deposito",
+        "seguro te toca",
+        "te lo agrego manualmente"
+      ],
+      "doNotUseWhen": [
+        "Cliente pide bono gratis por registro.",
+        "Cliente pide bono no disponible.",
+        "Consulta promocion 10% casino."
+      ],
+      "baseResponse": "Actualmente el bono disponible aplica unicamente para el primer deposito. Se otorga un bono de $100 cuando realizas tu primer deposito de $100 pesos en adelante. Si aun no has realizado tu primer deposito, el bono no se activa todavia. Una vez que el deposito sea confirmado, podras validar la promocion correspondiente.",
+      "angryCustomerResponse": "Entendemos tu duda. El bono disponible aplica solo para el primer deposito y requiere un deposito de $100 pesos en adelante. No podemos confirmarlo si el deposito no ha sido validado o si ya existio un primer deposito previo.",
+      "internalRecommendation": "Revisar historial de depositos antes de confirmar elegibilidad.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [
+        "bono_no_existe_por_registro",
+        "bono_10_casino_activacion",
+        "bono_no_disponible"
+      ]
+    },
+    {
+      "intent": "bono_no_disponible_cashback_lealtad",
+      "category": "bonos_promociones",
+      "subcategory": "bono_no_disponible",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para bono_no_disponible.",
+      "triggers": [
+        "cashback",
+        "bono cumpleaños",
+        "bono lealtad",
+        "bono referido",
+        "bono no visible",
+        "no tengo promociones"
+      ],
+      "subdiagnostics": [
+        "bono_no_disponible"
+      ],
+      "requiredData": [
+        "bono solicitado",
+        "captura de promociones si aplica"
+      ],
+      "responseRules": [
+        "el cliente pide un bono que no esta disponible",
+        "no hay promocion visible aplicable",
+        "no existe aprobacion interna",
+        "no ofrecer bonos manuales",
+        "no prometer futuras promociones",
+        "no escalar como excepcion sin instruccion interna"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "hay promocion activa en la cuenta",
+        "el cliente reclama un bono ya ganado",
+        "requiere validar historial"
+      ],
+      "baseResponse": "Por el momento no contamos con ese bono o beneficio disponible para tu cuenta. Si en el futuro se activa una promocion aplicable, podras verla directamente desde el apartado de Promociones dentro de tu cuenta.",
+      "angryCustomerResponse": "Entiendo que esperabas un beneficio adicional. En este momento no contamos con ese bono disponible para tu cuenta, por lo que no podemos prometerlo ni aplicarlo como excepcion. Cualquier promocion vigente aparecera directamente en Promociones.",
+      "internalRecommendation": "no ofrecer bonos manuales no prometer futuras promociones no escalar como excepcion sin instruccion interna",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "bono_primer_deposito_condiciones",
+      "category": "bonos_promociones",
+      "subcategory": "primer_deposito",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para primer_deposito.",
+      "triggers": [
+        "bono primer deposito",
+        "primer deposito",
+        "deposite 100",
+        "bono de 100",
+        "no me dieron bono de bienvenida"
+      ],
+      "subdiagnostics": [
+        "primer_deposito"
+      ],
+      "requiredData": [
+        "monto del primer deposito",
+        "si fue una sola operacion",
+        "si ya existian depositos previos"
+      ],
+      "responseRules": [
+        "el cliente pregunta por bono de primer deposito",
+        "el bono depende del monto del primer deposito",
+        "no hay validacion especial pendiente",
+        "validar primer deposito antes de afirmar aplicacion",
+        "no prometer activacion manual",
+        "no mezclar con bono 10% casino"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "el cliente pregunta por bono sin deposito",
+        "el cliente jugo antes de activar otro bono",
+        "se requiere revisar historial de depositos"
+      ],
+      "baseResponse": "El bono de primer deposito aplica cuando el primer deposito cumple el monto minimo requerido en una sola operacion y conforme a las condiciones vigentes. Si el deposito se realizo en montos separados, ya existia un deposito previo o no cumple las condiciones, el sistema puede no activar el bono.",
+      "angryCustomerResponse": "Entiendo que esperabas recibir el bono. Para revisarlo correctamente necesitamos validar el primer deposito y que haya cumplido las condiciones de la promocion en una sola operacion. Si no cumple esas condiciones, no seria posible activarlo manualmente sin validacion interna.",
+      "internalRecommendation": "validar primer deposito antes de afirmar aplicacion no prometer activacion manual no mezclar con bono 10% casino",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "bono_sin_deposito_no_disponible",
+      "category": "bonos_promociones",
+      "subcategory": "bono_sin_deposito",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para bono_sin_deposito.",
+      "triggers": [
+        "bono sin deposito",
+        "bono por registrarme",
+        "descargar la app y obtener bono",
+        "bono gratis",
+        "bono de bienvenida gratis"
+      ],
+      "subdiagnostics": [
+        "bono_sin_deposito"
+      ],
+      "requiredData": [
+        "tipo de bono consultado",
+        "si el cliente ya deposito",
+        "si el bono aparece en promociones"
+      ],
+      "responseRules": [
+        "el cliente pregunta por bono gratis",
+        "el cliente pregunta por bono sin deposito",
+        "no existe promocion activa sin deposito",
+        "no prometer bonos no visibles",
+        "no ofrecer excepciones",
+        "no usar si el cliente tiene una promocion especifica aprobada"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "el cliente pregunta por bono de primer deposito",
+        "el cliente ya tiene una promocion activa visible",
+        "hay una excepcion aprobada internamente"
+      ],
+      "baseResponse": "Por el momento no contamos con bono sin deposito o bono gratis por registro. La promocion disponible aplica con deposito conforme a las condiciones vigentes dentro de la plataforma. Si aparece alguna promocion aplicable para tu cuenta, podras verla directamente en el apartado de Promociones.",
+      "angryCustomerResponse": "Entiendo la duda. Actualmente no tenemos activo un bono sin deposito o bono gratis por registro, por lo que no seria correcto prometerte un beneficio que no esta disponible. Te recomendamos revisar el apartado de Promociones para validar las ofertas vigentes aplicables a tu cuenta.",
+      "internalRecommendation": "no prometer bonos no visibles no ofrecer excepciones no usar si el cliente tiene una promocion especifica aprobada",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "cierre_cuenta_definitivo",
+      "category": "cuenta",
+      "priority": "high",
+      "riskLevel": "high",
+      "description": "Cliente solicita cerrar, eliminar o cancelar definitivamente su cuenta.",
+      "triggers": [
+        "quiero cerrar mi cuenta",
+        "eliminar cuenta",
+        "cancelar cuenta",
+        "dar de baja",
+        "autoexclusion"
+      ],
+      "subdiagnostics": [
+        "cierre_voluntario",
+        "verificacion_titular_para_cierre",
+        "juego_responsable",
+        "cierre_sin_reapertura"
+      ],
+      "requiredData": [
+        "confirmacion explicita de cierre",
+        "selfie sosteniendo INE",
+        "correo o AUTH ID",
+        "motivo si el cliente lo proporciona",
+        "validacion del titular"
+      ],
+      "responseRules": [
+        "Informar que el cierre es definitivo.",
+        "No cerrar sin verificacion.",
+        "Solicitar selfie sosteniendo INE.",
+        "Mencionar juego responsable cuando sea apropiado.",
+        "No prometer reapertura."
+      ],
+      "forbiddenPhrases": [
+        "puedes reabrir cuando quieras",
+        "la cierro sin validar",
+        "crea otra cuenta despues",
+        "no necesitamos confirmar identidad"
+      ],
+      "doNotUseWhen": [
+        "Cliente solo quiere cerrar sesion.",
+        "Cliente esta molesto pero no pide cierre definitivo.",
+        "Cliente pide recuperar acceso."
+      ],
+      "baseResponse": "Claro, podemos ayudarte con el cierre de tu cuenta. Solo considera que este proceso es definitivo, sin posibilidad de volver a abrir la cuenta o crear otra con tu identidad. Para continuar, por favor envianos una selfie sosteniendo tu INE de forma clara y legible. Esto es parte del protocolo de seguridad para confirmar que la solicitud proviene del titular de la cuenta. Una vez que recibamos la verificacion, procederemos con el cierre conforme a nuestros Terminos y Condiciones y en apego a nuestra politica de Juego Responsable.",
+      "angryCustomerResponse": "Entendemos tu solicitud. Podemos ayudarte con el cierre de la cuenta, pero por seguridad debemos confirmar que la solicitud proviene del titular. El cierre es definitivo, sin posibilidad de volver a abrir la cuenta o crear otra con la misma identidad. Para continuar, envia una selfie sosteniendo tu INE de forma clara y legible.",
+      "internalRecommendation": "Crear ticket o flujo interno de cierre solo despues de recibir verificacion completa y confirmacion explicita.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "kyc_verificacion_obligatoria",
+        "cliente_molesto_general"
+      ]
+    },
+    {
+      "intent": "deposito_cep_no_disponible_monitoreo",
+      "category": "depositos",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Cliente tiene comprobante o informe de pago, pero no existe CEP descargable desde Banxico o hay intermitencia para generarlo.",
+      "triggers": [
+        "no puedo descargar CEP",
+        "Banxico no encuentra el CEP",
+        "tengo informe liquidado",
+        "solo tengo comprobante",
+        "CEP no disponible"
+      ],
+      "subdiagnostics": [
+        "informe_no_sustituye_cep",
+        "banxico_intermitente",
+        "operacion_en_monitoreo",
+        "cep_pendiente_de_generacion"
+      ],
+      "requiredData": [
+        "comprobante o informe recibido",
+        "clave de rastreo",
+        "monto",
+        "fecha y hora",
+        "banco emisor",
+        "resultado de consulta en Banxico"
+      ],
+      "responseRules": [
+        "Explicar que el informe no sustituye al CEP.",
+        "Indicar que sin CEP el deposito queda en monitoreo.",
+        "Pedir intentar descargarlo nuevamente mas tarde.",
+        "No prometer acreditacion inmediata."
+      ],
+      "forbiddenPhrases": [
+        "con el informe basta",
+        "ya esta confirmado",
+        "seguro se acredita",
+        "te lo abonamos sin CEP"
+      ],
+      "doNotUseWhen": [
+        "El CEP ya esta disponible y completo.",
+        "El deposito es Mexpago.",
+        "El deposito es Spin by Oxxo."
+      ],
+      "baseResponse": "El comprobante o informe que nos compartes ayuda a revisar la operacion, pero para confirmar la liquidacion del SPEI necesitamos el CEP generado desde Banxico. Si por el momento no aparece disponible, dejaremos la operacion en monitoreo y te pedimos intentar consultarlo nuevamente mas tarde. En cuanto el CEP este disponible, compartelo en PDF para continuar con la validacion.",
+      "angryCustomerResponse": "Entendemos la molestia. El informe ayuda a revisar, pero no sustituye al CEP de Banxico, que es el documento necesario para confirmar la liquidacion SPEI. Mientras no este disponible, la operacion queda en monitoreo. Te pedimos intentar consultarlo nuevamente mas tarde y compartirlo en PDF cuando aparezca.",
+      "internalRecommendation": "No crear acreditacion manual sin CEP valido o confirmacion suficiente del proveedor.",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "deposito_spei_no_reflejado"
+      ]
+    },
+    {
+      "intent": "deposito_comprobante_no_sustituye_cep",
+      "category": "depositos",
+      "subcategory": "comprobante_sin_cep",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para comprobante_sin_cep.",
+      "triggers": [
+        "tengo comprobante",
+        "no tengo cep",
+        "solo tengo captura",
+        "comprobante bancario",
+        "no me da cep"
+      ],
+      "subdiagnostics": [
+        "comprobante_sin_cep"
+      ],
+      "requiredData": [
+        "comprobante bancario",
+        "clave de rastreo",
+        "monto",
+        "fecha",
+        "banco emisor"
+      ],
+      "responseRules": [
+        "el cliente solo tiene comprobante bancario",
+        "la operacion fue SPEI",
+        "el CEP no esta disponible aun",
+        "explicar diferencia comprobante vs CEP",
+        "no rechazar evidencia parcial",
+        "dejar en monitoreo si CEP no aparece"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "el metodo fue tarjeta",
+        "ya existe CEP exitoso",
+        "el deposito ya aparece abonado"
+      ],
+      "baseResponse": "El comprobante bancario ayuda a revisar la operacion, pero no sustituye el CEP de Banxico. El CEP es el documento que confirma el estado real del SPEI. Si aun no aparece disponible, intenta consultarlo mas tarde y compartelo en PDF junto con la clave de rastreo para continuar la validacion.",
+      "angryCustomerResponse": "Entiendo que ya tienes un comprobante, pero para validar correctamente un SPEI necesitamos el CEP de Banxico o la clave de rastreo. Ese documento permite confirmar si la operacion fue liquidada, rechazada o sigue pendiente.",
+      "internalRecommendation": "explicar diferencia comprobante vs CEP no rechazar evidencia parcial dejar en monitoreo si CEP no aparece",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "deposito_mexpago_pendiente",
+      "category": "depositos",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "description": "Deposito realizado por Mexpago o proveedor similar que aparece pendiente o no confirmado.",
+      "triggers": [
+        "Mexpago pendiente",
+        "pague por Mexpago",
+        "proveedor no confirma",
+        "correo de Mexpago",
+        "referencia de pago pendiente"
+      ],
+      "subdiagnostics": [
+        "pago_no_confirmado",
+        "correo_confirmacion_pendiente",
+        "referencia_por_validar",
+        "posible_devolucion_origen"
+      ],
+      "requiredData": [
+        "correo de confirmacion de Mexpago",
+        "monto",
+        "fecha",
+        "referencia de pago",
+        "captura completa del comprobante"
+      ],
+      "responseRules": [
+        "Explicar que pago pendiente no significa pago exitoso.",
+        "Pedir correo de confirmacion si existe.",
+        "No prometer acreditacion sin confirmacion del proveedor.",
+        "Indicar que puede devolverse a origen si no se completa."
+      ],
+      "forbiddenPhrases": [
+        "ya esta pagado",
+        "seguro se acredita",
+        "te lo abonamos ahora",
+        "el proveedor ya confirmo"
+      ],
+      "doNotUseWhen": [
+        "Es transferencia SPEI con CEP.",
+        "Es Spin by Oxxo.",
+        "Ya existe confirmacion final del proveedor."
+      ],
+      "baseResponse": "En nuestro sistema el pago aun aparece como pendiente. Esto puede significar que el proceso de pago no termino correctamente o que el proveedor todavia no ha confirmado la operacion. Si tienes correo de confirmacion de Mexpago, compartelo completo para revisar monto, fecha y referencia de pago. En caso de que el pago no se complete, el monto puede devolverse a la cuenta de origen conforme al proceso del proveedor.",
+      "angryCustomerResponse": "Entendemos tu molestia. En sistema el pago aun aparece pendiente, por lo que no podemos confirmarlo como exitoso hasta que el proveedor lo valide. Si tienes correo de confirmacion de Mexpago, compartelo completo para revisar monto, fecha y referencia. Con eso podremos darle seguimiento sin prometer una acreditacion que aun no esta confirmada.",
+      "internalRecommendation": "Si hay correo y referencia completa, revisar con proveedor o crear seguimiento segun proceso interno.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "deposito_spei_no_reflejado",
+        "deposito_spin_conciliacion"
+      ]
+    },
+    {
+      "intent": "deposito_saldo_visible_en_juego",
+      "category": "depositos",
+      "subcategory": "saldo_visible_juego",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para saldo_visible_juego.",
+      "triggers": [
+        "no aparece mi saldo",
+        "saldo no refleja en lobby",
+        "saldo dentro del juego",
+        "deposito aparece en juego",
+        "saldo disponible en casino"
+      ],
+      "subdiagnostics": [
+        "saldo_visible_juego"
+      ],
+      "requiredData": [
+        "correo registrado",
+        "monto",
+        "hora aproximada",
+        "resultado de revisar dentro del juego"
+      ],
+      "responseRules": [
+        "el deposito aparece en sistema",
+        "el saldo no se ve en pantalla principal",
+        "se necesita validar sincronizacion visual",
+        "usar solo si hay indicios de saldo en sistema",
+        "si no aparece dentro del juego, escalar a pagos",
+        "no decir que ya esta resuelto hasta confirmacion del cliente"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "el deposito no aparece en sistema",
+        "el saldo tampoco aparece dentro del juego",
+        "hay error de proveedor confirmado"
+      ],
+      "baseResponse": "Por favor ingresa a cualquier juego de casino y revisa si dentro del juego aparece tu saldo disponible. En ocasiones el saldo puede tardar en sincronizarse correctamente en la pantalla principal. Despues de entrar, sal del juego y revisa nuevamente tu saldo en la cuenta. Quedo atento a lo que te aparezca.",
+      "angryCustomerResponse": "Entiendo la molestia. Para confirmar si es un tema de sincronizacion visual, necesitamos validar si el saldo aparece dentro de un juego de casino. Ingresa a cualquier juego, revisa el saldo disponible y despues vuelve a la pantalla principal para confirmar si se actualiza.",
+      "internalRecommendation": "usar solo si hay indicios de saldo en sistema si no aparece dentro del juego, escalar a pagos no decir que ya esta resuelto hasta confirmacion del cliente",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "deposito_spei_no_reflejado",
+      "category": "depositos",
+      "priority": "high",
+      "riskLevel": "high",
+      "description": "Transferencia SPEI realizada por el cliente que no aparece acreditada en Betxico.",
+      "triggers": [
+        "deposite y no aparece",
+        "spei no reflejado",
+        "ya me descontaron",
+        "transferencia no llego",
+        "tengo comprobante"
+      ],
+      "subdiagnostics": [
+        "comprobante_incompleto",
+        "cep_pendiente",
+        "clave_rastreo_disponible",
+        "operacion_por_validar"
+      ],
+      "requiredData": [
+        "captura completa de la transferencia",
+        "monto exacto",
+        "fecha y hora",
+        "banco emisor",
+        "cuenta o CLABE destino",
+        "clave de rastreo",
+        "CEP de Banxico en PDF"
+      ],
+      "responseRules": [
+        "Pedir comprobante completo y CEP.",
+        "No acreditar sin CEP valido o confirmacion del proveedor.",
+        "No confundir informe de pago con CEP.",
+        "No prometer acreditacion inmediata."
+      ],
+      "forbiddenPhrases": [
+        "seguro se acredita",
+        "ya quedo",
+        "hoy se refleja",
+        "te lo abonamos sin CEP",
+        "tu dinero se perdio"
+      ],
+      "doNotUseWhen": [
+        "El caso es Mexpago pendiente.",
+        "El cliente ya tiene informe liquidado pero no CEP.",
+        "El deposito fue por Spin by Oxxo."
+      ],
+      "baseResponse": "Para poder revisar correctamente tu deposito, necesitamos que nos compartas una captura completa de la transferencia donde se vea monto depositado, fecha y hora, banco emisor, cuenta o CLABE destino y clave de rastreo. Tambien necesitamos que descargues el CEP desde la pagina oficial de Banxico y nos lo compartas en PDF. Con esa informacion podremos validar el estado de la operacion y revisar si corresponde la acreditacion.",
+      "angryCustomerResponse": "Entendemos tu molestia. Para revisar correctamente el deposito y evitar darte una respuesta incorrecta, necesitamos la captura completa de la transferencia y el CEP de Banxico en PDF. Con esos datos podemos validar el estado real de la operacion y darle seguimiento conforme al proceso correspondiente.",
+      "internalRecommendation": "Crear ticket solo cuando existan comprobantes completos y datos minimos suficientes.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "deposito_cep_no_disponible_monitoreo",
+        "deposito_mexpago_pendiente",
+        "deposito_spin_conciliacion"
+      ]
+    },
+    {
+      "intent": "deposito_spei_no_reflejado_pedir_cep",
+      "category": "depositos",
+      "subcategory": "spei_no_reflejado",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para spei_no_reflejado.",
+      "triggers": [
+        "deposite y no aparece",
+        "hice transferencia y no se refleja",
+        "mi deposito no llego",
+        "spei no reflejado",
+        "ya me descontaron"
+      ],
+      "subdiagnostics": [
+        "spei_no_reflejado"
+      ],
+      "requiredData": [
+        "correo registrado",
+        "monto",
+        "fecha aproximada",
+        "CEP o clave de rastreo"
+      ],
+      "responseRules": [
+        "el cliente indica transferencia SPEI",
+        "el deposito no se refleja en saldo",
+        "no hay confirmacion suficiente del proveedor",
+        "no confirmar abono sin CEP",
+        "no prometer tiempo exacto",
+        "no decir que el dinero esta perdido"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "el cliente deposito con tarjeta",
+        "el saldo ya aparece dentro del juego",
+        "el caso ya fue reportado a pagos"
+      ],
+      "baseResponse": "Con gusto te apoyo. Para revisar tu deposito, por favor comparteme el CEP de Banxico o la clave de rastreo de la transferencia, junto con el monto y la hora aproximada en la que realizaste el movimiento. Con esa informacion podremos validar correctamente el estatus del pago.",
+      "angryCustomerResponse": "Entiendo la molestia. Para revisarlo correctamente necesitamos validar el movimiento con el CEP o la clave de rastreo, ya que ese dato permite confirmar el estado real de la transferencia. Por favor compartemelo y con gusto lo revisamos.",
+      "internalRecommendation": "no confirmar abono sin CEP no prometer tiempo exacto no decir que el dinero esta perdido",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "deposito_spin_conciliacion",
+      "category": "depositos",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "description": "Deposito por Spin by Oxxo que no se refleja y puede requerir conciliacion con proveedor o banco.",
+      "triggers": [
+        "deposite por Spin",
+        "Spin by Oxxo no reflejado",
+        "pago Oxxo no aparece",
+        "conciliacion Spin",
+        "comprobante Spin"
+      ],
+      "subdiagnostics": [
+        "conciliacion_proveedor",
+        "comprobante_spin_pendiente",
+        "confirmacion_banco_pendiente",
+        "operacion_por_liberar"
+      ],
+      "requiredData": [
+        "comprobante completo del pago",
+        "monto",
+        "fecha y hora",
+        "referencia",
+        "cuenta o metodo usado"
+      ],
+      "responseRules": [
+        "Explicar que puede requerir conciliacion.",
+        "Pedir comprobante completo.",
+        "No prometer acreditacion inmediata.",
+        "Indicar que proveedor/banco debe confirmar."
+      ],
+      "forbiddenPhrases": [
+        "ya se acredita",
+        "hoy queda",
+        "seguro fue error de Spin",
+        "te lo abonamos sin validar"
+      ],
+      "doNotUseWhen": [
+        "Es SPEI con CEP.",
+        "Es Mexpago.",
+        "El pago ya fue confirmado y acreditado."
+      ],
+      "baseResponse": "Tu pago por Spin by Oxxo puede requerir proceso de conciliacion. En estos casos, el proveedor debe confirmar la operacion con el banco para que pueda liberarse correctamente hacia Betxico. Te pedimos compartir el comprobante completo del pago para revisarlo. Una vez validada la informacion, se dara seguimiento al proceso correspondiente.",
+      "angryCustomerResponse": "Entendemos la molestia por la espera. Los pagos por Spin by Oxxo pueden requerir conciliacion con el proveedor o banco antes de liberarse correctamente. Compartenos el comprobante completo para revisar la informacion y dar seguimiento al proceso correspondiente sin prometer una acreditacion antes de validarla.",
+      "internalRecommendation": "Crear seguimiento si el comprobante esta completo y el pago no se refleja despues de la revision inicial.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "deposito_spei_no_reflejado",
+        "deposito_mexpago_pendiente"
+      ]
+    },
+    {
+      "intent": "problema_tecnico_juego",
+      "category": "juegos",
+      "priority": "high",
+      "riskLevel": "high",
+      "description": "Intent universal para fallas tecnicas de juegos: no carga, se traba, expulsa, pausa, reinicia, muestra error o existe posible saldo afectado.",
+      "triggers": [
+        "juego no carga",
+        "el juego se trabo",
+        "me saco del juego",
+        "se pauso el juego",
+        "se bajo mi saldo",
+        "error en casino"
+      ],
+      "subdiagnostics": [
+        "juego_no_carga_o_expulsa",
+        "juego_error_con_saldo_afectado",
+        "posible_jugada_pendiente",
+        "retraso_sincronizacion_saldo",
+        "pruebas_basicas_navegador"
+      ],
+      "requiredData": [
+        "nombre exacto del juego",
+        "captura o video del error",
+        "hora aproximada",
+        "captura del historial o movimientos si hay saldo afectado",
+        "dispositivo",
+        "conexion WiFi o datos moviles"
+      ],
+      "responseRules": [
+        "Usar este intent para variaciones menores y evitar duplicar plantillas.",
+        "Pedir pruebas basicas si no hay saldo afectado.",
+        "Pedir evidencia e historial si hay saldo afectado.",
+        "No prometer reposicion.",
+        "No asegurar falla del proveedor sin revision."
+      ],
+      "forbiddenPhrases": [
+        "te vamos a reponer",
+        "el proveedor fallo",
+        "es culpa de tu internet",
+        "el saldo se perdio",
+        "seguro fue error del juego"
+      ],
+      "doNotUseWhen": [
+        "El problema es solo acceso por enlace externo.",
+        "El problema es perfil no actualizado.",
+        "El cliente solo reclama perdidas sin error tecnico especifico."
+      ],
+      "baseResponse": "Para poder revisar correctamente el problema con el juego, necesitamos que nos compartas el nombre exacto del juego, captura o video corto del error, hora aproximada en que ocurrio, dispositivo utilizado y si estabas usando WiFi o datos moviles. Si hubo saldo afectado, comparte tambien captura del historial del juego o de movimientos donde se vea la jugada o saldo afectado. Con esta informacion podemos revisar la sesion del juego y validar si hubo alguna jugada pendiente, error de conexion o consumo de saldo registrado por el proveedor.",
+      "angryCustomerResponse": "Entendemos la molestia. Para revisar el caso con precision y evitar darte una respuesta incorrecta, necesitamos evidencia del juego: nombre exacto, captura o video del error, hora aproximada, dispositivo, conexion utilizada y, si hubo saldo afectado, historial o movimientos donde se vea la jugada. Por el momento no podemos confirmar una reposicion sin revisar primero la evidencia y el historial.",
+      "internalRecommendation": "Crear ticket o escalamiento a proveedor solo si hay evidencia suficiente, nombre de juego, hora e historial cuando aplique.",
+      "requiresTicket": true,
+      "requiresDocuments": false,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "acceso_error_enlace_externo",
+        "cliente_acusa_robo_perdidas"
+      ]
+    },
+    {
+      "intent": "kyc_verificacion_incorrecta_nueva_cuenta",
+      "category": "kyc",
+      "priority": "high",
+      "riskLevel": "high",
+      "description": "Cuenta verificada con foto de foto, otra persona o datos que no corresponden correctamente al titular; puede requerir bloqueo y nueva cuenta con datos correctos.",
+      "triggers": [
+        "verificacion incorrecta",
+        "foto de foto",
+        "otra persona verifico",
+        "datos no corresponden",
+        "crear nueva cuenta"
+      ],
+      "subdiagnostics": [
+        "foto_de_foto",
+        "identidad_no_corresponde",
+        "cuenta_bloqueada_seguridad",
+        "transferencia_saldo_a_nueva_cuenta"
+      ],
+      "requiredData": [
+        "motivo de inconsistencia",
+        "estado de bloqueo",
+        "saldo pendiente",
+        "datos de nueva cuenta",
+        "verificacion correcta de nueva cuenta"
+      ],
+      "responseRules": [
+        "Explicar que por seguridad la cuenta no puede continuar activa.",
+        "Indicar que debe crear nueva cuenta con datos correctos si aplica.",
+        "No prometer bono de bienvenida en nueva cuenta.",
+        "No prometer transferencia de saldo sin verificacion correcta."
+      ],
+      "forbiddenPhrases": [
+        "puedes seguir usando esa cuenta",
+        "te damos otro bono",
+        "te pasamos el saldo sin validar",
+        "no pasa nada con la verificacion"
+      ],
+      "doNotUseWhen": [
+        "Solo falta enviar documentos.",
+        "La cuenta se puede validar normalmente.",
+        "El caso es recuperacion de acceso sin inconsistencia."
+      ],
+      "baseResponse": "Por seguridad, la cuenta no puede continuar activa cuando la verificacion no corresponde correctamente al titular o presenta inconsistencias en la identidad. En este caso, sera necesario crear una nueva cuenta con tus datos correctos y realizar la verificacion de identidad de forma completa. Una vez que la nueva cuenta sea verificada correctamente, podremos revisar la transferencia del saldo pendiente a esa cuenta. Es importante considerar que no aplicara bono de bienvenida en la nueva cuenta.",
+      "angryCustomerResponse": "Entendemos la situacion. Sin embargo, por seguridad no podemos mantener activa una cuenta cuando la verificacion no corresponde correctamente al titular o presenta inconsistencias. Para continuar, sera necesario crear una nueva cuenta con datos correctos y completar la verificacion. Solo despues de esa validacion podremos revisar la transferencia de saldo pendiente, sin aplicar bono de bienvenida en la nueva cuenta.",
+      "internalRecommendation": "Este caso requiere cuidado: validar bloqueo, saldo y nueva cuenta antes de confirmar cualquier movimiento.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "kyc_verificacion_obligatoria",
+        "bono_no_existe_por_registro"
+      ]
+    },
+    {
+      "intent": "kyc_verificacion_obligatoria",
+      "category": "kyc",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Cliente necesita completar verificacion de identidad para jugar, depositar, retirar, recuperar acceso o continuar proceso.",
+      "triggers": [
+        "verificar cuenta",
+        "me piden INE",
+        "validar identidad",
+        "documentos KYC",
+        "selfie con INE"
+      ],
+      "subdiagnostics": [
+        "ine_frente_reverso",
+        "selfie_con_ine",
+        "recuperacion_acceso",
+        "validacion_titular"
+      ],
+      "requiredData": [
+        "INE frente",
+        "INE reverso",
+        "selfie sosteniendo INE",
+        "correo o AUTH ID",
+        "motivo de verificacion"
+      ],
+      "responseRules": [
+        "Pedir documentos claros y legibles.",
+        "Explicar que es protocolo de seguridad.",
+        "No prometer aprobacion inmediata.",
+        "Enviar a revision cuando se reciban completos."
+      ],
+      "forbiddenPhrases": [
+        "con eso queda aprobado",
+        "no necesitas verificarte",
+        "se libera de inmediato",
+        "mandalos como sea"
+      ],
+      "doNotUseWhen": [
+        "La verificacion fue incorrecta y requiere nueva cuenta.",
+        "Solo hay error de navegador sin solicitud documental.",
+        "Es cierre definitivo de cuenta."
+      ],
+      "baseResponse": "Para continuar con el proceso, necesitamos validar tu identidad. Por favor envianos fotografia clara y legible de tu INE por ambos lados, ademas de una selfie sosteniendo tu INE junto a tu rostro. Esto forma parte del protocolo de seguridad para proteger tu cuenta y confirmar que el proceso lo realiza el titular.",
+      "angryCustomerResponse": "Entendemos que el proceso pueda resultar incomodo, pero la verificacion es necesaria para proteger tu cuenta y confirmar que el tramite lo realiza el titular. Por favor comparte INE por ambos lados y una selfie sosteniendo tu INE junto a tu rostro, todo claro y legible, para enviarlo a revision.",
+      "internalRecommendation": "Si se reciben documentos incompletos o ilegibles, pedir correccion puntual y no avanzar a revision.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "kyc_verificacion_incorrecta_nueva_cuenta",
+        "retiro_documentacion_pendiente",
+        "cierre_cuenta_definitivo"
+      ]
+    },
+    {
+      "intent": "kyc_pedir_ine_ambos_lados",
+      "category": "kyc_documentos",
+      "subcategory": "ine_ambos_lados",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para ine_ambos_lados.",
+      "triggers": [
+        "ine",
+        "documentos",
+        "verificar cuenta",
+        "validar identidad",
+        "retiro por verificar"
+      ],
+      "subdiagnostics": [
+        "ine_ambos_lados"
+      ],
+      "requiredData": [
+        "INE frente",
+        "INE reverso",
+        "imagenes claras y legibles"
+      ],
+      "responseRules": [
+        "se requiere verificacion de identidad",
+        "falta INE",
+        "no hay rechazo por suplantacion",
+        "no aprobar KYC manualmente",
+        "no aceptar imagen borrosa",
+        "validar titularidad"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "documento ya fue rechazado por fraude",
+        "cliente no es titular",
+        "se requiere caratula bancaria"
+      ],
+      "baseResponse": "Para continuar con la verificacion, por favor comparte fotografia clara y legible de tu INE por ambos lados. Asegurate de que los datos se vean completos, sin recortes, reflejos o partes borrosas.",
+      "angryCustomerResponse": "Entiendo que el proceso puede ser incomodo, pero la verificacion es necesaria para proteger tu cuenta. Envia tu INE por ambos lados de forma clara y legible para poder continuar la revision.",
+      "internalRecommendation": "no aprobar KYC manualmente no aceptar imagen borrosa validar titularidad",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "kyc_pedir_selfie_sosteniendo_ine",
+      "category": "kyc_documentos",
+      "subcategory": "selfie_ine",
+      "priority": "high",
+      "riskLevel": "low",
+      "description": "Plantilla curada Soporte 10 V1 para selfie_ine.",
+      "triggers": [
+        "selfie",
+        "foto sosteniendo ine",
+        "sosteniendo tu ine",
+        "documento para retiro",
+        "validacion de rostro"
+      ],
+      "subdiagnostics": [
+        "selfie_ine"
+      ],
+      "requiredData": [
+        "selfie clara",
+        "INE junto al rostro",
+        "rostro y documento visibles"
+      ],
+      "responseRules": [
+        "falta selfie con INE",
+        "se requiere validacion del titular",
+        "no hay sospecha delicada confirmada",
+        "no aceptar foto de foto",
+        "no aprobar si no coincide titularidad",
+        "escalar si hay inconsistencia"
+      ],
+      "forbiddenPhrases": [
+        "te lo aseguro",
+        "queda hoy",
+        "en unos minutos",
+        "ya fue aprobado",
+        "te damos un bono",
+        "te reponemos el saldo"
+      ],
+      "doNotUseWhen": [
+        "hay foto de foto",
+        "hay suplantacion sospechada",
+        "el cierre de cuenta requiere protocolo especial"
+      ],
+      "baseResponse": "Para completar la validacion, por favor envia una selfie clara sosteniendo tu INE junto a tu rostro. Deben verse completos tu rostro y el documento, sin ediciones, reflejos o partes borrosas.",
+      "angryCustomerResponse": "Entiendo la molestia. Esta selfie se solicita para confirmar que el tramite lo realiza el titular de la cuenta. Por favor compartela de forma clara sosteniendo tu INE junto a tu rostro.",
+      "internalRecommendation": "no aceptar foto de foto no aprobar si no coincide titularidad escalar si hay inconsistencia",
+      "requiresTicket": false,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": true,
+      "relatedIntents": [],
+      "templateRef": {
+        "source": "support10_curated_v1",
+        "mode": "plantilla_segura",
+        "status": "aprobada",
+        "safeFallback": true
+      }
+    },
+    {
+      "intent": "acceso_error_enlace_externo",
+      "category": "perfil_sesion",
+      "priority": "medium",
+      "riskLevel": "low",
+      "description": "Errores de camara, PIN, carga o sesion cuando el cliente abre Betxico desde enlaces externos o navegadores integrados.",
+      "triggers": [
+        "abri desde Facebook",
+        "abri desde Instagram",
+        "no abre camara",
+        "error de PIN",
+        "navegador integrado",
+        "link externo"
+      ],
+      "subdiagnostics": [
+        "facebook_browser",
+        "instagram_browser",
+        "camara_bloqueada",
+        "pin_no_carga",
+        "sesion_en_navegador_integrado"
+      ],
+      "requiredData": [
+        "desde donde abrio el enlace",
+        "navegador usado",
+        "captura del error",
+        "dispositivo"
+      ],
+      "responseRules": [
+        "Pedir cerrar sesion y ventana externa.",
+        "Indicar usar Chrome o Safari.",
+        "Pedir escribir directamente betxico.mx.",
+        "No diagnosticar bloqueo si no esta confirmado."
+      ],
+      "forbiddenPhrases": [
+        "tu cuenta esta bloqueada",
+        "es culpa de Facebook",
+        "no podemos hacer nada",
+        "tu celular no sirve"
+      ],
+      "doNotUseWhen": [
+        "El error persiste despues de pruebas basicas y ya requiere revision tecnica.",
+        "El problema es retiro por bono o KYC.",
+        "El problema es juego con saldo afectado."
+      ],
+      "baseResponse": "El problema puede presentarse cuando se abre Betxico desde un enlace externo o navegador integrado, como Facebook o Instagram. Por favor cierra sesion, cierra completamente esa ventana y abre Google Chrome o Safari. Escribe directamente betxico.mx en la barra del navegador e inicia sesion nuevamente. Despues intenta repetir el proceso desde ahi.",
+      "angryCustomerResponse": "Entendemos que el error es incomodo. Para descartar que venga del navegador integrado del enlace externo, cierra sesion, cierra completamente esa ventana y abre Betxico desde Chrome o Safari escribiendo directamente betxico.mx. Si el problema continua desde ahi, envianos captura del error para revisarlo.",
+      "internalRecommendation": "Si persiste en Chrome/Safari con evidencia, mover a perfil_error_actualizacion o ticket tecnico.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": true,
+      "canAutoRespond": true,
+      "relatedIntents": [
+        "perfil_error_actualizacion",
+        "retiro_error_sesion_navegador",
+        "problema_tecnico_juego"
+      ]
+    },
+    {
+      "intent": "perfil_error_actualizacion",
+      "category": "perfil_sesion",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "description": "Perfil, cuenta o datos no cargan o no se actualizan aun despues de pruebas basicas.",
+      "triggers": [
+        "perfil no carga",
+        "no se actualiza mi cuenta",
+        "mis datos no cambian",
+        "error en perfil",
+        "ya borre cache y sigue"
+      ],
+      "subdiagnostics": [
+        "perfil_no_actualiza",
+        "revision_area_tecnica",
+        "pruebas_basicas_realizadas",
+        "ajuste_directo_en_cuenta"
+      ],
+      "requiredData": [
+        "captura del error",
+        "datos que no actualizan",
+        "pruebas ya realizadas",
+        "dispositivo y navegador",
+        "correo o AUTH ID"
+      ],
+      "responseRules": [
+        "Confirmar seguimiento tecnico si ya fue reportado.",
+        "Pedir intentar mas tarde solo si hay revision activa.",
+        "No prometer hora de correccion.",
+        "No pedir documentos si no aplica."
+      ],
+      "forbiddenPhrases": [
+        "hoy queda",
+        "ya esta corregido",
+        "es culpa de tu navegador",
+        "no podemos hacer nada"
+      ],
+      "doNotUseWhen": [
+        "Es solo error por enlace externo sin pruebas.",
+        "Es retiro restringido por bono.",
+        "Es KYC documental."
+      ],
+      "baseResponse": "Tu caso ya fue reportado y se esta revisando la actualizacion de tu perfil. Te pedimos intentar nuevamente mas tarde y, de ser posible, ingresar desde Google Chrome o Safari escribiendo directamente betxico.mx. Sabemos que ya realizaste algunos pasos, pero el area tecnica continua revisando el ajuste directamente en tu cuenta.",
+      "angryCustomerResponse": "Entendemos la molestia por la espera. El caso ya fue reportado para revisar la actualizacion directamente en tu cuenta. No contamos con un tiempo exacto de correccion, pero el area tecnica continua dando seguimiento. Te pedimos intentar nuevamente mas tarde desde Chrome o Safari escribiendo directamente betxico.mx.",
+      "internalRecommendation": "Crear o actualizar ticket tecnico con evidencia si el error persiste despues de pruebas basicas.",
+      "requiresTicket": true,
+      "requiresDocuments": false,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "acceso_error_enlace_externo",
+        "retiro_error_sesion_navegador"
+      ]
+    },
+    {
+      "intent": "cliente_acusa_robo_perdidas",
+      "category": "quejas",
+      "priority": "high",
+      "riskLevel": "high",
+      "description": "Cliente acusa robo, fraude o manipulacion por perdidas en casino, sin evidencia de error tecnico especifico.",
+      "triggers": [
+        "el casino roba",
+        "nunca gano",
+        "me robaron mi dinero",
+        "otros casinos si pagan",
+        "deposite y perdi todo",
+        "quiero compensacion por perdidas"
+      ],
+      "subdiagnostics": [
+        "perdidas_sin_error_tecnico",
+        "acusacion_robo",
+        "solicitud_compensacion",
+        "juego_responsable",
+        "posible_error_tecnico_si_hay_evidencia"
+      ],
+      "requiredData": [
+        "si existe error tecnico especifico",
+        "nombre del juego si reclama error",
+        "hora aproximada",
+        "captura o historial si hay evidencia",
+        "tipo de compensacion solicitada"
+      ],
+      "responseRules": [
+        "Mantener tono firme y empatico.",
+        "Explicar que juegos de casino tienen resultados aleatorios.",
+        "No prometer compensacion.",
+        "No ofrecer bonos no disponibles.",
+        "Recomendar juego responsable.",
+        "Si hay error tecnico especifico, pedir evidencia y mover a problema_tecnico_juego."
+      ],
+      "forbiddenPhrases": [
+        "si robamos",
+        "te vamos a compensar",
+        "te damos bono por perder",
+        "seguro fue error del casino",
+        "tienes garantia de ganar"
+      ],
+      "doNotUseWhen": [
+        "Hay evidencia concreta de error tecnico de juego.",
+        "El reclamo es deposito no reflejado.",
+        "El reclamo es retiro bajo revision."
+      ],
+      "baseResponse": "Entendemos tu molestia. Es importante aclarar que los juegos de casino funcionan con resultados aleatorios y no existe garantia de ganancia en cada deposito o sesion de juego. No contamos con una compensacion o bono aplicable por perdidas de juego. Te recomendamos jugar siempre con responsabilidad, establecer limites y participar unicamente con montos que estes dispuesto a arriesgar. Si consideras que hubo un error tecnico especifico en algun juego, por favor compartenos el nombre del juego, hora aproximada y evidencia para poder revisarlo.",
+      "angryCustomerResponse": "Entendemos que la situacion te genere molestia. Los juegos de casino funcionan con resultados aleatorios y no existe garantia de ganancia por deposito o sesion. No podemos ofrecer compensacion o bono por perdidas de juego. Si hubo un error tecnico especifico, compartenos nombre del juego, hora aproximada y evidencia para revisarlo conforme al proceso correspondiente.",
+      "internalRecommendation": "No abrir ticket por perdidas sin evidencia tecnica. Si aporta evidencia de error, reclasificar a problema_tecnico_juego.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "problema_tecnico_juego",
+        "cliente_molesto_general",
+        "bono_no_disponible"
+      ]
+    },
+    {
+      "intent": "cliente_molesto_general",
+      "category": "quejas",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Cliente expresa enojo, frustracion, amenaza con denunciar, exige solucion inmediata o reclama demora sin un diagnostico tecnico unico confirmado.",
+      "triggers": [
+        "estoy molesto",
+        "voy a denunciar",
+        "exijo solucion",
+        "siempre es lo mismo",
+        "me estan dando largas",
+        "quiero hablar con supervisor"
+      ],
+      "subdiagnostics": [
+        "molestia_por_demora",
+        "amenaza_denuncia",
+        "exigencia_solucion_inmediata",
+        "caso_sin_datos_suficientes",
+        "seguimiento_existente"
+      ],
+      "requiredData": [
+        "categoria real del caso",
+        "datos faltantes",
+        "si existe reporte previo",
+        "estado actual del proceso",
+        "ultima respuesta enviada"
+      ],
+      "responseRules": [
+        "Reconocer molestia sin discutir.",
+        "No aceptar culpa no validada.",
+        "No prometer dinero, bono, reposicion o pago inmediato.",
+        "Reencuadrar al proceso correcto.",
+        "Pedir datos si faltan."
+      ],
+      "forbiddenPhrases": [
+        "calmate",
+        "no podemos hacer nada",
+        "tienes razon, fue nuestra culpa",
+        "te vamos a compensar",
+        "te lo soluciono ahorita"
+      ],
+      "doNotUseWhen": [
+        "Existe intent especifico suficiente como retiro, deposito, KYC, bono o juego.",
+        "El cliente acusa robo por perdidas de casino sin error tecnico."
+      ],
+      "baseResponse": "Entendemos tu molestia y te ofrecemos una disculpa por la situacion. Para poder ayudarte correctamente, necesitamos revisar el caso con la informacion disponible y evitar darte una respuesta incorrecta o prometer un resultado que aun no esta confirmado. Tu caso sera revisado conforme al proceso correspondiente y, si necesitamos informacion adicional, te la solicitaremos por este medio.",
+      "angryCustomerResponse": "Entendemos tu molestia y la tomamos con seriedad. Para poder darte una respuesta correcta, debemos revisar el caso con la informacion disponible y seguir el proceso correspondiente. No seria responsable prometer un resultado inmediato sin validacion, pero si falta informacion te la solicitaremos por este medio para continuar.",
+      "internalRecommendation": "Usar como capa de tono; si hay intent especifico, responder con el intent especifico y tono de cliente molesto.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "retiro_bajo_revision_sin_dictamen",
+        "deposito_spei_no_reflejado",
+        "problema_tecnico_juego",
+        "cliente_acusa_robo_perdidas"
+      ]
+    },
+    {
+      "intent": "retiro_bajo_revision_sin_dictamen",
+      "category": "retiros",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Retiro pendiente, bajo revision o en espera de validacion sin dictamen, motivo confirmado, aprobacion, rechazo ni solicitud documental.",
+      "triggers": [
+        "mi retiro esta en revision",
+        "cuanto tarda mi retiro",
+        "no me han pagado",
+        "sigue pendiente",
+        "espera de autorizacion"
+      ],
+      "subdiagnostics": [
+        "retiro_pendiente_sin_resolucion",
+        "retiro_bajo_validacion_seguridad",
+        "retiro_sin_motivo_confirmado",
+        "retiro_sin_solicitud_documental"
+      ],
+      "requiredData": [
+        "estado actual del retiro",
+        "si existe dictamen",
+        "si hay documentos pendientes",
+        "si aparece failed, congelado o devuelto",
+        "si ya esta aprobado o pagado"
+      ],
+      "responseRules": [
+        "Informar que esta bajo revision por el area correspondiente.",
+        "Explicar que forma parte de validaciones de seguridad y control.",
+        "No dar tiempo exacto.",
+        "No informar motivo si no existe dictamen.",
+        "No prometer aprobacion."
+      ],
+      "forbiddenPhrases": [
+        "hoy queda",
+        "ya quedo aprobado",
+        "en unas horas se paga",
+        "seguro se aprueba",
+        "el banco ya lo esta procesando"
+      ],
+      "doNotUseWhen": [
+        "El retiro aparece failed o congelado.",
+        "El retiro fue devuelto por banco o CLABE.",
+        "Existe solicitud documental confirmada.",
+        "El retiro esta restringido por bono o rollover."
+      ],
+      "baseResponse": "Tu retiro aparece actualmente bajo revision por parte del area correspondiente. Este proceso forma parte de las validaciones de seguridad y control que aplican para todas las cuentas, por lo que debemos esperar a que finalice la revision. Por el momento no contamos con un tiempo exacto de resolucion ni con un motivo especifico para informarte, ya que el retiro aun no ha sido dictaminado. En cuanto sea aprobado o si se requiere informacion adicional, se te notificara por este medio o directamente en tu cuenta.",
+      "angryCustomerResponse": "Entendemos tu molestia por la espera. En este momento tu retiro continua bajo revision por parte del area correspondiente. Aun no contamos con una resolucion o motivo especifico para informarte, por lo que no seria correcto darte un tiempo exacto o una causa no confirmada. Tu solicitud sigue en proceso y, en cuanto exista una actualizacion o se requiera informacion adicional, se te notificara por este medio o directamente en tu cuenta.",
+      "internalRecommendation": "Revisar si ya existe dictamen antes de responder. Si no hay dictamen, mantener respuesta cautelosa y no escalar como rechazo.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "retiro_congelado_failed_proveedor",
+        "retiro_devuelto_banco_clabe",
+        "retiro_documentacion_pendiente",
+        "retiro_saldo_restringido_bono_rollover"
+      ]
+    },
+    {
+      "intent": "retiro_congelado_failed_proveedor",
+      "category": "retiros",
+      "priority": "high",
+      "riskLevel": "high",
+      "description": "Retiro marcado como failed, congelado, atorado o detenido por intermitencia del proveedor de pagos.",
+      "triggers": [
+        "retiro failed",
+        "retiro congelado",
+        "retiro atorado",
+        "error del proveedor",
+        "no se cancela mi retiro"
+      ],
+      "subdiagnostics": [
+        "failed_proveedor",
+        "congelado_cancelacion_pendiente",
+        "devolucion_a_saldo_casino",
+        "seguimiento_general_proveedor"
+      ],
+      "requiredData": [
+        "estado failed o congelado confirmado",
+        "monto del retiro",
+        "fecha de solicitud",
+        "si ya esta dentro del seguimiento general"
+      ],
+      "responseRules": [
+        "Indicar que se solicita cancelacion y devolucion a saldo casino.",
+        "No crear ticket individual si ya pertenece a seguimiento general.",
+        "No prometer fecha de devolucion.",
+        "No decir que el banco tiene el dinero si no esta confirmado."
+      ],
+      "forbiddenPhrases": [
+        "hoy se cancela",
+        "ya te lo devolvemos",
+        "el proveedor ya fallo",
+        "el banco tiene tu dinero",
+        "te lo pagamos en unas horas"
+      ],
+      "doNotUseWhen": [
+        "El retiro solo esta bajo revision sin estado failed.",
+        "El banco rechazo la transferencia.",
+        "Faltan documentos para liberar el retiro."
+      ],
+      "baseResponse": "Disculpa, en sistema aparece que tu retiro quedo congelado por una intermitencia del proveedor de pagos. El caso ya se encuentra reportado para solicitar la cancelacion del retiro y la devolucion del monto a tu cuenta de casino. Este proceso no tiene un tiempo de ejecucion definido, ya que dependemos del proveedor de pagos. Solo seria esperar a que el monto se vea reflejado nuevamente en tu saldo.",
+      "angryCustomerResponse": "Entendemos que necesitas una respuesta mas exacta. Sin embargo, en este tipo de casos no contamos con un tiempo definido, ya que dependemos de la actualizacion del proveedor de pagos. Lo importante es que el retiro ya fue identificado dentro del seguimiento general y se encuentra en proceso para que el monto sea devuelto a tu cuenta de casino.",
+      "internalRecommendation": "No duplicar tickets si el caso pertenece al seguimiento general de retiros failed/congelados.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "retiro_bajo_revision_sin_dictamen",
+        "retiro_devuelto_banco_clabe"
+      ]
+    },
+    {
+      "intent": "retiro_devuelto_banco_clabe",
+      "category": "retiros",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Retiro rechazado, devuelto o no aceptado por banco receptor, CLABE, titularidad o limites de la cuenta bancaria.",
+      "triggers": [
+        "retiro devuelto",
+        "banco rechazo",
+        "clabe incorrecta",
+        "no acepto la transferencia",
+        "cuenta no recibe spei"
+      ],
+      "subdiagnostics": [
+        "clabe_incorrecta",
+        "cuenta_con_limites",
+        "rechazo_banco_receptor",
+        "titularidad_no_validada"
+      ],
+      "requiredData": [
+        "estatus de devolucion o rechazo",
+        "CLABE registrada",
+        "banco receptor",
+        "monto",
+        "si la cuenta pertenece al titular"
+      ],
+      "responseRules": [
+        "Explicar que el banco pudo rechazar o devolver la transferencia.",
+        "Indicar que el monto debe regresar a saldo casino.",
+        "No culpar directamente al cliente.",
+        "Recomendar validar cuenta y CLABE con su banco.",
+        "No dar tiempo exacto."
+      ],
+      "forbiddenPhrases": [
+        "es culpa de tu banco",
+        "tu CLABE esta mal",
+        "hoy regresa",
+        "ya puedes retirar otra vez",
+        "el banco ya tiene tu dinero"
+      ],
+      "doNotUseWhen": [
+        "El retiro aun no tiene rechazo confirmado.",
+        "El retiro aparece failed por proveedor.",
+        "El retiro esta detenido por documentos."
+      ],
+      "baseResponse": "Tu retiro fue devuelto o rechazado por el banco receptor, por lo que el monto debe regresar a tu cuenta de casino para que puedas solicitarlo nuevamente. Te recomendamos validar con tu banco que tu cuenta pueda recibir transferencias SPEI por el monto solicitado y que la CLABE este activa y correcta. Por el momento no contamos con un tiempo exacto de devolucion, ya que depende del procesamiento bancario y del proveedor de pagos. En cuanto el saldo se refleje nuevamente en tu cuenta, podras solicitar el retiro otra vez.",
+      "angryCustomerResponse": "Entendemos la molestia. En este caso el retiro fue devuelto o rechazado por el banco receptor, por lo que debemos esperar a que el monto regrese a tu cuenta de casino. No seria correcto darte un tiempo exacto porque depende del procesamiento bancario y del proveedor de pagos. Te recomendamos validar con tu banco que la cuenta pueda recibir SPEI por ese monto y que la CLABE este activa y correcta.",
+      "internalRecommendation": "Si aplica regla de titularidad, pedir CLABE del titular antes de intentar nuevamente.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": true,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "retiro_bajo_revision_sin_dictamen",
+        "retiro_congelado_failed_proveedor"
+      ]
+    },
+    {
+      "intent": "retiro_documentacion_pendiente",
+      "category": "retiros",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Retiro detenido porque el sistema o area correspondiente requiere documentos para validar identidad, perfil o cuenta bancaria.",
+      "triggers": [
+        "me piden documentos para retirar",
+        "documentos pendientes",
+        "validacion para liberar retiro",
+        "ine para retiro",
+        "selfie con ine"
+      ],
+      "subdiagnostics": [
+        "identidad_pendiente",
+        "comprobante_domicilio_pendiente",
+        "caratula_bancaria_pendiente",
+        "estado_cuenta_pendiente"
+      ],
+      "requiredData": [
+        "documentos solicitados por el area",
+        "estado de verificacion",
+        "si la cuenta bancaria es del titular",
+        "correo o AUTH ID",
+        "monto y retiro relacionado"
+      ],
+      "responseRules": [
+        "Pedir solo los documentos requeridos.",
+        "Explicar que es protocolo de seguridad.",
+        "No confirmar liberacion inmediata.",
+        "Indicar que los documentos seran revisados."
+      ],
+      "forbiddenPhrases": [
+        "mandalos y queda aprobado",
+        "con eso liberamos hoy",
+        "seguro ya queda",
+        "no necesitas validacion"
+      ],
+      "doNotUseWhen": [
+        "No hay solicitud documental confirmada.",
+        "El problema es de navegador o sesion.",
+        "El retiro esta failed por proveedor."
+      ],
+      "baseResponse": "Para poder continuar con la validacion y liberar el proceso de retiro, necesitamos que nos apoyes enviando la documentacion solicitada de forma clara y legible. Por favor comparte los documentos requeridos por este medio. Una vez recibidos, se enviaran a revision con el area correspondiente para continuar con el proceso. El envio de documentos no significa aprobacion inmediata, ya que primero deben ser validados.",
+      "angryCustomerResponse": "Entendemos la molestia. La documentacion se solicita como parte del protocolo de seguridad para proteger la cuenta y confirmar la informacion del titular. En cuanto compartas los documentos requeridos de forma clara y legible, se enviaran a revision con el area correspondiente. No podemos confirmar liberacion inmediata hasta que la validacion concluya.",
+      "internalRecommendation": "Crear ticket si ya se recibieron documentos completos o si el caso requiere validacion documental del area correspondiente.",
+      "requiresTicket": true,
+      "requiresDocuments": true,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "kyc_verificacion_obligatoria",
+        "retiro_bajo_revision_sin_dictamen"
+      ]
+    },
+    {
+      "intent": "retiro_error_sesion_navegador",
+      "category": "retiros",
+      "priority": "medium",
+      "riskLevel": "low",
+      "description": "Cliente puede iniciar sesion pero no puede avanzar en solicitud de retiro por posible cache, sesion, navegador o carga.",
+      "triggers": [
+        "no puedo retirar",
+        "me da error al retirar",
+        "no avanza el retiro",
+        "se queda cargando al retirar",
+        "no me deja solicitar retiro"
+      ],
+      "subdiagnostics": [
+        "cache_cookies",
+        "sesion_vencida",
+        "navegador_integrado",
+        "captura_error_pendiente"
+      ],
+      "requiredData": [
+        "captura del error",
+        "navegador usado",
+        "dispositivo",
+        "si ya intento cerrar sesion y borrar cache",
+        "si existe bloqueo, bono, KYC o rollover confirmado"
+      ],
+      "responseRules": [
+        "Pedir pruebas basicas de sesion y navegador.",
+        "Pedir captura si persiste.",
+        "No asumir bloqueo sin confirmacion.",
+        "No pedir documentos si no se confirmo que hacen falta."
+      ],
+      "forbiddenPhrases": [
+        "es culpa de tu celular",
+        "tu cuenta esta bloqueada",
+        "seguro es por documentos",
+        "ya esta rechazado"
+      ],
+      "doNotUseWhen": [
+        "Ya existe KYC pendiente confirmado.",
+        "Ya existe bono activo o rollover confirmado.",
+        "El retiro fue rechazado por banco.",
+        "El retiro esta bajo revision."
+      ],
+      "baseResponse": "Necesitamos hacer unas pruebas para descartar que sea un problema de sesion o de carga en tu navegador. Por favor cierra sesion de tu cuenta de Betxico, cierra completamente la pestaña o aplicacion, borra cache y cookies, vuelve a ingresar desde Google Chrome o Safari escribiendo directamente betxico.mx e intenta solicitar nuevamente el retiro. Si despues de realizar estos pasos el problema continua, envianos una nueva captura del mensaje que aparece al intentar retirar para poder revisarlo nuevamente.",
+      "angryCustomerResponse": "Entendemos que es molesto no poder avanzar con el retiro. Para descartar un problema de sesion o navegador, necesitamos que cierres sesion, cierres completamente la pestaña o aplicacion, borres cache y cookies e ingreses nuevamente desde Chrome o Safari escribiendo directamente betxico.mx. Si el error continua, envianos una captura actual del mensaje para revisarlo con el area correspondiente.",
+      "internalRecommendation": "Si despues de pruebas persiste y hay evidencia, crear ticket tecnico con captura, dispositivo y navegador.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": true,
+      "canAutoRespond": true,
+      "relatedIntents": [
+        "acceso_error_enlace_externo",
+        "perfil_error_actualizacion",
+        "retiro_documentacion_pendiente",
+        "retiro_saldo_restringido_bono_rollover"
+      ]
+    },
+    {
+      "intent": "retiro_saldo_restringido_bono_rollover",
+      "category": "retiros",
+      "priority": "high",
+      "riskLevel": "medium",
+      "description": "Cliente no puede retirar porque tiene bono activo, saldo restringido o rollover pendiente.",
+      "triggers": [
+        "saldo restringido",
+        "rollover pendiente",
+        "bono activo",
+        "no puedo retirar por bono",
+        "liberar saldo"
+      ],
+      "subdiagnostics": [
+        "bono_activo",
+        "rollover_total_pendiente",
+        "rollover_parcial",
+        "juegos_validos_para_rollover"
+      ],
+      "requiredData": [
+        "bono activo",
+        "rollover total requerido",
+        "rollover ejecutado",
+        "rollover pendiente",
+        "juegos validos para cumplir rollover"
+      ],
+      "responseRules": [
+        "Explicar que el saldo puede permanecer restringido hasta completar el rollover.",
+        "Mostrar montos de rollover solo si estan confirmados.",
+        "No prometer liberacion sin cumplimiento.",
+        "No cancelar bono si no existe instruccion confirmada."
+      ],
+      "forbiddenPhrases": [
+        "te libero el saldo",
+        "ya puedes retirar",
+        "te cancelamos el bono",
+        "no tienes que cumplir rollover"
+      ],
+      "doNotUseWhen": [
+        "No hay bono activo confirmado.",
+        "El retiro esta bajo revision por otra causa.",
+        "El retiro fue devuelto por banco."
+      ],
+      "baseResponse": "Tu saldo se encuentra restringido debido a un bono activo. Para poder liberar el retiro, es necesario completar el 100% del requisito de rollover correspondiente. Una vez que completes el requisito, el saldo podra quedar disponible para retiro conforme a las reglas de la promocion.",
+      "angryCustomerResponse": "Entendemos que quieras retirar tu saldo. En este caso, el saldo se mantiene restringido por un bono activo y debe completarse el requisito de rollover correspondiente antes de quedar disponible para retiro. No podemos liberar el retiro sin que se cumplan las reglas de la promocion.",
+      "internalRecommendation": "Antes de responder, revisar montos exactos de rollover y juegos validos; si no estan disponibles, no inventarlos.",
+      "requiresTicket": false,
+      "requiresDocuments": false,
+      "requiresScreenshot": false,
+      "canAutoRespond": false,
+      "relatedIntents": [
+        "bono_10_casino_activacion",
+        "bono_primer_deposito",
+        "retiro_bajo_revision_sin_dictamen"
+      ]
+    }
+  ]
+}

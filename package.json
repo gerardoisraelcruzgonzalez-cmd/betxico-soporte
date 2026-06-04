@@ -1,0 +1,17 @@
+{
+  "name": "betxico-soporte-livechat-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx vercel dev",
+    "deploy:env": "node scripts/deploy-with-env.mjs",
+    "deploy:env:prod": "node scripts/deploy-with-env.mjs --prod",
+    "ai:sync-knowledge": "node scripts/sync-openai-knowledge.mjs",
+    "ai:extract-support10": "node scripts/extract-support10-response-candidates.mjs",
+    "ai:curate-support10": "node scripts/curate-support10-response-candidates.mjs",
+    "ai:integrate-support10": "node scripts/integrate-approved-support10-templates.mjs",
+    "ai:test-support10-templates": "node scripts/test-support10-template-integration.mjs",
+    "check": "node scripts/check.mjs"
+  }
+}

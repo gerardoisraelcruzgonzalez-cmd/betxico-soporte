@@ -1,0 +1,94 @@
+{
+  "adminEmails": [
+    "gerardo.cruz@betxico.mx"
+  ],
+  "authorizedUsers": [
+    {
+      "email": "gerardo.cruz@betxico.mx",
+      "displayName": "Gerardo Cruz",
+      "role": "admin",
+      "enabled": true
+    }
+  ],
+  "aiAssistant": {
+    "enabled": true,
+    "baseInstructions": "Eres el asistente interno de soporte de Betxico para agentes humanos. Responde claro, directo y operativo. Antes de crear una respuesta, consulta la base de conocimiento operativa. No crees nuevos diagnosticos si el caso puede pertenecer a un intent universal existente. Usa subdiagnosticos y variantes para evitar duplicidad.",
+    "businessContext": "Betxico opera soporte con LiveChat, Jira y Slack. Los casos frecuentes son depositos, retiros, KYC, bonos, juegos, cierres de sesiones y escalaciones.",
+    "toneRules": "Usa tono empatico, profesional y breve. Cuando sea para cliente, entrega texto listo para copiar.",
+    "safetyRules": "No prometas abonos, retiros, bonos, validaciones ni desbloqueos sin evidencia y aprobacion interna. No inventes datos.",
+    "defaultResponseFormat": "Si es respuesta al cliente, entrega el mensaje final. Si es analisis interno, lista datos faltantes y siguiente accion.",
+    "vectorStoreId": "",
+    "maxExamples": 5,
+    "fileSearchMaxResults": 3
+  },
+  "reportWorkflows": [
+    {
+      "id": "deposito-no-reflejado",
+      "label": "Deposito no reflejado",
+      "destination": "both",
+      "jiraIssueType": "Transacciones",
+      "slackRouteId": "deposito-no-reflejado",
+      "slackTemplate": "deposit",
+      "requiredSlackFields": ["agentName", "customerId", "customerEmail", "trackingKey", "amount"],
+      "enabled": true
+    },
+    {
+      "id": "cierre-sesiones",
+      "label": "Cierre de sesiones",
+      "destination": "slack",
+      "jiraIssueType": "",
+      "slackRouteId": "cierre-sesiones",
+      "slackTemplate": "session-close",
+      "requiredSlackFields": ["game", "customerId", "customerEmail"],
+      "enabled": true
+    },
+    {
+      "id": "cierre-sesiones-jira",
+      "label": "Cierre de sesiones - Jira",
+      "destination": "jira",
+      "jiraIssueType": "Servicio al Cliente",
+      "slackRouteId": "",
+      "slackTemplate": "",
+      "requiredSlackFields": [],
+      "enabled": true
+    },
+    {
+      "id": "jira",
+      "label": "Jira",
+      "destination": "jira",
+      "jiraIssueType": "",
+      "slackRouteId": "",
+      "slackTemplate": "",
+      "requiredSlackFields": [],
+      "enabled": true
+    }
+  ],
+  "slackRoutes": [
+    {
+      "id": "deposito-no-reflejado",
+      "name": "Deposito no reflejado",
+      "mode": "both",
+      "match": {
+        "issueTypes": [
+          "Deposito no reflejado",
+          "Servicio al Cliente"
+        ]
+      },
+      "channelId": "C090D8TEVS6",
+      "listId": "F0AENAZPMFE",
+      "listColumns": {
+        "customerId": "",
+        "customerEmail": "",
+        "trackingKey": "",
+        "amount": "",
+        "movementProof": "",
+        "status": "",
+        "description": "",
+        "agentName": "",
+        "jiraUrl": "",
+        "createdAt": ""
+      },
+      "listColumnTypes": {}
+    }
+  ]
+}

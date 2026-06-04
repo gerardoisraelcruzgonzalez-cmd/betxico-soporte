@@ -1,0 +1,333 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-06-04T15:57:59.927Z",
+  "project": "Betxico Soporte",
+  "description": "Plantillas seguras aprobadas para fallback sin GPT.",
+  "source": "tmp/livechat-response-mining/plantillas_aprobadas_soporte10_v1.json",
+  "templates": [
+    {
+      "intent": "acceso_cambio_password_pedir_captura",
+      "category": "acceso_cuenta",
+      "subcategory": "recuperacion_password",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "no puedo entrar",
+        "contraseña temporal",
+        "me rechaza la contraseña",
+        "cambiar contraseña",
+        "recuperar contraseña"
+      ],
+      "requiredData": [
+        "correo registrado",
+        "captura del error en login",
+        "dispositivo o navegador"
+      ],
+      "doNotUseWhen": [
+        "cuenta bloqueada por seguridad",
+        "KYC delicado",
+        "autoexclusion o cierre definitivo"
+      ],
+      "response": "Para ayudarte con el acceso, por favor enviame una captura del area de inicio de sesion donde se vea el correo que estas usando y el mensaje de error. Con eso validamos si el problema viene de la contraseña, el correo o la sesion.",
+      "angryCustomerResponse": "Entiendo que es molesto no poder entrar. Para revisar el acceso correctamente necesito una captura del login con el correo usado y el mensaje de error. Asi evitamos darte una indicacion incorrecta.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "acceso_enlace_externo_navegador_integrado",
+      "category": "acceso_cuenta",
+      "subcategory": "navegador_externo",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "facebook",
+        "instagram",
+        "enlace externo",
+        "navegador integrado",
+        "no carga",
+        "se cierra sesion"
+      ],
+      "requiredData": [
+        "navegador usado",
+        "dispositivo",
+        "captura del error"
+      ],
+      "doNotUseWhen": [
+        "error aparece tambien en Chrome/Safari",
+        "hay bloqueo de cuenta",
+        "hay problema de pagos o retiro"
+      ],
+      "response": "Por favor cierra esa ventana y abre Betxico directamente desde Google Chrome o Safari escribiendo betxico.mx en la barra del navegador. Los enlaces abiertos desde Facebook, Instagram u otros navegadores integrados pueden generar errores de sesion o carga.",
+      "angryCustomerResponse": "Entiendo que el error es incomodo. Para descartar que venga del navegador integrado, abre Betxico directamente desde Chrome o Safari escribiendo betxico.mx. Si el problema continua desde ahi, envianos captura del error.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "bono_10_casino_activacion",
+      "category": "bonos_promociones",
+      "subcategory": "bono_10_casino",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "bono 10%",
+        "10 casino",
+        "promocion 10",
+        "activar bono",
+        "bono en depositos arriba de 250"
+      ],
+      "requiredData": [
+        "monto depositado",
+        "si el bono fue activado antes de jugar",
+        "si el saldo ya fue usado"
+      ],
+      "doNotUseWhen": [
+        "el cliente ya jugo antes de activar",
+        "el deposito no cumple monto minimo",
+        "no aparece promocion aplicable"
+      ],
+      "response": "Para activar la promocion del 10% en casino, realiza un deposito que cumpla el monto minimo vigente y despues entra al apartado de Promociones para activar el bono antes de jugar o apostar. Es importante activarlo antes de usar el saldo, porque si juegas primero el beneficio puede dejar de aplicar sobre ese deposito.",
+      "angryCustomerResponse": "Entiendo la molestia. Esta promocion requiere activarse desde Promociones antes de jugar o apostar con el saldo. Si el saldo se uso antes de activar el bono, el beneficio puede dejar de aplicar conforme a las reglas de la promocion.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "bono_no_disponible_cashback_lealtad",
+      "category": "bonos_promociones",
+      "subcategory": "bono_no_disponible",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "cashback",
+        "bono cumpleaños",
+        "bono lealtad",
+        "bono referido",
+        "bono no visible",
+        "no tengo promociones"
+      ],
+      "requiredData": [
+        "bono solicitado",
+        "captura de promociones si aplica"
+      ],
+      "doNotUseWhen": [
+        "hay promocion activa en la cuenta",
+        "el cliente reclama un bono ya ganado",
+        "requiere validar historial"
+      ],
+      "response": "Por el momento no contamos con ese bono o beneficio disponible para tu cuenta. Si en el futuro se activa una promocion aplicable, podras verla directamente desde el apartado de Promociones dentro de tu cuenta.",
+      "angryCustomerResponse": "Entiendo que esperabas un beneficio adicional. En este momento no contamos con ese bono disponible para tu cuenta, por lo que no podemos prometerlo ni aplicarlo como excepcion. Cualquier promocion vigente aparecera directamente en Promociones.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "bono_primer_deposito_condiciones",
+      "category": "bonos_promociones",
+      "subcategory": "primer_deposito",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "bono primer deposito",
+        "primer deposito",
+        "deposite 100",
+        "bono de 100",
+        "no me dieron bono de bienvenida"
+      ],
+      "requiredData": [
+        "monto del primer deposito",
+        "si fue una sola operacion",
+        "si ya existian depositos previos"
+      ],
+      "doNotUseWhen": [
+        "el cliente pregunta por bono sin deposito",
+        "el cliente jugo antes de activar otro bono",
+        "se requiere revisar historial de depositos"
+      ],
+      "response": "El bono de primer deposito aplica cuando el primer deposito cumple el monto minimo requerido en una sola operacion y conforme a las condiciones vigentes. Si el deposito se realizo en montos separados, ya existia un deposito previo o no cumple las condiciones, el sistema puede no activar el bono.",
+      "angryCustomerResponse": "Entiendo que esperabas recibir el bono. Para revisarlo correctamente necesitamos validar el primer deposito y que haya cumplido las condiciones de la promocion en una sola operacion. Si no cumple esas condiciones, no seria posible activarlo manualmente sin validacion interna.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "bono_sin_deposito_no_disponible",
+      "category": "bonos_promociones",
+      "subcategory": "bono_sin_deposito",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "bono sin deposito",
+        "bono por registrarme",
+        "descargar la app y obtener bono",
+        "bono gratis",
+        "bono de bienvenida gratis"
+      ],
+      "requiredData": [
+        "tipo de bono consultado",
+        "si el cliente ya deposito",
+        "si el bono aparece en promociones"
+      ],
+      "doNotUseWhen": [
+        "el cliente pregunta por bono de primer deposito",
+        "el cliente ya tiene una promocion activa visible",
+        "hay una excepcion aprobada internamente"
+      ],
+      "response": "Por el momento no contamos con bono sin deposito o bono gratis por registro. La promocion disponible aplica con deposito conforme a las condiciones vigentes dentro de la plataforma. Si aparece alguna promocion aplicable para tu cuenta, podras verla directamente en el apartado de Promociones.",
+      "angryCustomerResponse": "Entiendo la duda. Actualmente no tenemos activo un bono sin deposito o bono gratis por registro, por lo que no seria correcto prometerte un beneficio que no esta disponible. Te recomendamos revisar el apartado de Promociones para validar las ofertas vigentes aplicables a tu cuenta.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "deposito_comprobante_no_sustituye_cep",
+      "category": "depositos",
+      "subcategory": "comprobante_sin_cep",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "tengo comprobante",
+        "no tengo cep",
+        "solo tengo captura",
+        "comprobante bancario",
+        "no me da cep"
+      ],
+      "requiredData": [
+        "comprobante bancario",
+        "clave de rastreo",
+        "monto",
+        "fecha",
+        "banco emisor"
+      ],
+      "doNotUseWhen": [
+        "el metodo fue tarjeta",
+        "ya existe CEP exitoso",
+        "el deposito ya aparece abonado"
+      ],
+      "response": "El comprobante bancario ayuda a revisar la operacion, pero no sustituye el CEP de Banxico. El CEP es el documento que confirma el estado real del SPEI. Si aun no aparece disponible, intenta consultarlo mas tarde y compartelo en PDF junto con la clave de rastreo para continuar la validacion.",
+      "angryCustomerResponse": "Entiendo que ya tienes un comprobante, pero para validar correctamente un SPEI necesitamos el CEP de Banxico o la clave de rastreo. Ese documento permite confirmar si la operacion fue liquidada, rechazada o sigue pendiente.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "deposito_saldo_visible_en_juego",
+      "category": "depositos",
+      "subcategory": "saldo_visible_juego",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "no aparece mi saldo",
+        "saldo no refleja en lobby",
+        "saldo dentro del juego",
+        "deposito aparece en juego",
+        "saldo disponible en casino"
+      ],
+      "requiredData": [
+        "correo registrado",
+        "monto",
+        "hora aproximada",
+        "resultado de revisar dentro del juego"
+      ],
+      "doNotUseWhen": [
+        "el deposito no aparece en sistema",
+        "el saldo tampoco aparece dentro del juego",
+        "hay error de proveedor confirmado"
+      ],
+      "response": "Por favor ingresa a cualquier juego de casino y revisa si dentro del juego aparece tu saldo disponible. En ocasiones el saldo puede tardar en sincronizarse correctamente en la pantalla principal. Despues de entrar, sal del juego y revisa nuevamente tu saldo en la cuenta. Quedo atento a lo que te aparezca.",
+      "angryCustomerResponse": "Entiendo la molestia. Para confirmar si es un tema de sincronizacion visual, necesitamos validar si el saldo aparece dentro de un juego de casino. Ingresa a cualquier juego, revisa el saldo disponible y despues vuelve a la pantalla principal para confirmar si se actualiza.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "deposito_spei_no_reflejado_pedir_cep",
+      "category": "depositos",
+      "subcategory": "spei_no_reflejado",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "deposite y no aparece",
+        "hice transferencia y no se refleja",
+        "mi deposito no llego",
+        "spei no reflejado",
+        "ya me descontaron"
+      ],
+      "requiredData": [
+        "correo registrado",
+        "monto",
+        "fecha aproximada",
+        "CEP o clave de rastreo"
+      ],
+      "doNotUseWhen": [
+        "el cliente deposito con tarjeta",
+        "el saldo ya aparece dentro del juego",
+        "el caso ya fue reportado a pagos"
+      ],
+      "response": "Con gusto te apoyo. Para revisar tu deposito, por favor comparteme el CEP de Banxico o la clave de rastreo de la transferencia, junto con el monto y la hora aproximada en la que realizaste el movimiento. Con esa informacion podremos validar correctamente el estatus del pago.",
+      "angryCustomerResponse": "Entiendo la molestia. Para revisarlo correctamente necesitamos validar el movimiento con el CEP o la clave de rastreo, ya que ese dato permite confirmar el estado real de la transferencia. Por favor compartemelo y con gusto lo revisamos.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "kyc_pedir_ine_ambos_lados",
+      "category": "kyc_documentos",
+      "subcategory": "ine_ambos_lados",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "ine",
+        "documentos",
+        "verificar cuenta",
+        "validar identidad",
+        "retiro por verificar"
+      ],
+      "requiredData": [
+        "INE frente",
+        "INE reverso",
+        "imagenes claras y legibles"
+      ],
+      "doNotUseWhen": [
+        "documento ya fue rechazado por fraude",
+        "cliente no es titular",
+        "se requiere caratula bancaria"
+      ],
+      "response": "Para continuar con la verificacion, por favor comparte fotografia clara y legible de tu INE por ambos lados. Asegurate de que los datos se vean completos, sin recortes, reflejos o partes borrosas.",
+      "angryCustomerResponse": "Entiendo que el proceso puede ser incomodo, pero la verificacion es necesaria para proteger tu cuenta. Envia tu INE por ambos lados de forma clara y legible para poder continuar la revision.",
+      "source": "support10_curated_v1"
+    },
+    {
+      "intent": "kyc_pedir_selfie_sosteniendo_ine",
+      "category": "kyc_documentos",
+      "subcategory": "selfie_ine",
+      "riskLevel": "low",
+      "mode": "plantilla_segura",
+      "status": "aprobada",
+      "canAutoRespond": true,
+      "triggers": [
+        "selfie",
+        "foto sosteniendo ine",
+        "sosteniendo tu ine",
+        "documento para retiro",
+        "validacion de rostro"
+      ],
+      "requiredData": [
+        "selfie clara",
+        "INE junto al rostro",
+        "rostro y documento visibles"
+      ],
+      "doNotUseWhen": [
+        "hay foto de foto",
+        "hay suplantacion sospechada",
+        "el cierre de cuenta requiere protocolo especial"
+      ],
+      "response": "Para completar la validacion, por favor envia una selfie clara sosteniendo tu INE junto a tu rostro. Deben verse completos tu rostro y el documento, sin ediciones, reflejos o partes borrosas.",
+      "angryCustomerResponse": "Entiendo la molestia. Esta selfie se solicita para confirmar que el tramite lo realiza el titular de la cuenta. Por favor compartela de forma clara sosteniendo tu INE junto a tu rostro.",
+      "source": "support10_curated_v1"
+    }
+  ]
+}
