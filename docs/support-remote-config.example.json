@@ -21,6 +21,18 @@
     "maxExamples": 5,
     "fileSearchMaxResults": 3
   },
+  "liveChatAutomation": {
+    "enabled": true,
+    "safeTemplateMode": "suggest_only",
+    "autoWelcome": {
+      "enabled": true,
+      "onlyForAgents": [
+        "gerardo.cruz@betxico.mx"
+      ],
+      "message": "Buenas noches, bienvenido a Betxico💚\n¿En que te puedo ayudar? 🙂‍↔️",
+      "oncePerChat": true
+    }
+  },
   "reportWorkflows": [
     {
       "id": "deposito-no-reflejado",

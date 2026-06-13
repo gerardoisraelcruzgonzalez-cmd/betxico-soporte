@@ -44,6 +44,7 @@ export default async function handler(req, res) {
         listColumns: route.listColumns
       })),
       liveChatAutomation: selectPublicLiveChatAutomation(config, account),
+      traceability: selectPublicTraceability(config, account),
       activeAlerts
     });
   } catch (error) {
@@ -55,6 +56,27 @@ export default async function handler(req, res) {
   }
 }
 
+function selectPublicTraceability(config, account = null) {
+  const traceability = config.traceability || {};
+  // Los depositos contienen datos sensibles (CLABE, nombre del depositante).
+  // Solo se exponen a una cuenta autenticada; sin sesion valida se omiten.
+  const hasAuthenticatedAccount = Boolean(account?.email);
+  return {
+    enabled: traceability.enabled !== false,
+    updatedAt: traceability.updatedAt || "",
+    deposits: hasAuthenticatedAccount && Array.isArray(traceability.deposits)
+      ? traceability.deposits.map((deposit) => ({
+          email: deposit.email,
+          depositAmount: deposit.depositAmount,
+          depositClabe: deposit.depositClabe,
+          depositDate: deposit.depositDate,
+          depositorName: deposit.depositorName,
+          dateTs: deposit.dateTs || 0
+        }))
+      : []
+  };
+}
+
 function selectPublicLiveChatAutomation(config, account) {
   const automation = config.liveChatAutomation || {};
   const autoWelcome = automation.autoWelcome || {};
@@ -63,6 +85,7 @@ function selectPublicLiveChatAutomation(config, account) {
   const allowed = Boolean(email) && (!allowedAgents.length || allowedAgents.includes(email));
   return {
     enabled: automation.enabled !== false,
+    safeTemplateMode: automation.safeTemplateMode || "suggest_only",
     autoWelcome: {
       enabled: autoWelcome.enabled !== false && allowed,
       message: autoWelcome.message || "",

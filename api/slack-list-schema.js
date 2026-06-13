@@ -16,7 +16,8 @@ export default async function handler(req, res) {
     if (mode === "items" || panelId) {
       const panelItems = await getSlackListPanelItems(panelId, {
         email: requestUrl.searchParams.get("email") || "",
-        query: requestUrl.searchParams.get("query") || ""
+        query: requestUrl.searchParams.get("query") || "",
+        limit: requestUrl.searchParams.get("limit") || ""
       });
       return sendJson(res, 200, { ok: true, ...panelItems });
     }

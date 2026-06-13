@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Soporte Betxico</title>
-    <link rel="stylesheet" href="/styles.css?v=20260602d">
+    <link rel="stylesheet" href="/styles.css?v=20260605a">
   </head>
   <body>
     <main class="admin-shell">
@@ -71,6 +71,60 @@
         <section class="form-card">
           <div class="admin-section-heading">
             <div>
+              <h2>Trazabilidad de cuentas</h2>
+              <p>Carga el CSV de depositos del dia. Los agentes veran en cada retiro si la CLABE coincide con el ultimo deposito del cliente.</p>
+            </div>
+          </div>
+          <div class="admin-ai-grid">
+            <label>
+              Archivo CSV de depositos
+              <input id="traceabilityDepositFile" type="file" accept=".csv,.txt,text/csv,text/plain">
+            </label>
+            <label class="check-field"><input id="traceabilityEnabled" type="checkbox"> Trazabilidad activa</label>
+            <label class="span-2">Depositos pegados
+              <textarea id="traceabilityDepositText" rows="6" placeholder="Pega aqui el CSV de Paybridge si no quieres subir archivo."></textarea>
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button id="parseTraceabilityBtn" type="button" class="secondary-button">Procesar depositos</button>
+            <button id="clearTraceabilityBtn" type="button" class="secondary-button danger-light">Limpiar depositos</button>
+          </div>
+          <p id="traceabilityAdminSummary" class="settings-note">Sin depositos cargados.</p>
+        </section>
+
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
+              <h2>Automatizacion LiveChat</h2>
+              <p>Controla bienvenida y plantillas seguras sin GPT desde configuracion remota.</p>
+            </div>
+          </div>
+          <div class="admin-ai-grid">
+            <label>Modo plantillas seguras
+              <select id="safeTemplateMode">
+                <option value="suggest_only">Solo sugerir al agente</option>
+                <option value="auto_send_safe">Auto-enviar seguras</option>
+                <option value="disabled">Desactivado</option>
+              </select>
+            </label>
+            <label class="check-field"><input id="liveChatAutomationEnabled" type="checkbox"> Automatizacion activa</label>
+            <label class="check-field"><input id="liveChatAutoWelcomeEnabled" type="checkbox"> Bienvenida automatica activa</label>
+            <label class="check-field"><input id="liveChatWelcomeOncePerChat" type="checkbox"> Una bienvenida por chat</label>
+            <label class="span-2">Agentes con bienvenida automatica
+              <input id="liveChatWelcomeAgents" type="text" placeholder="soporte10@betxico.mx, anahy@betxico.mx">
+            </label>
+            <label class="span-2">Mensaje de bienvenida
+              <textarea id="liveChatWelcomeMessage" rows="4" placeholder="Buenas noches, bienvenido a Betxico..."></textarea>
+            </label>
+          </div>
+          <p class="settings-note">
+            Recomendado: deja "Solo sugerir al agente" hasta probar. "Auto-enviar seguras" solo responde plantillas aprobadas, de bajo riesgo y marcadas como auto_send_allowed.
+          </p>
+        </section>
+
+        <section class="form-card">
+          <div class="admin-section-heading">
+            <div>
               <h2>Entrenamiento GPT</h2>
               <p>Define instrucciones, base documental y ejemplos aprobados para el asistente.</p>
             </div>
@@ -115,6 +169,6 @@
       <section id="adminStatus" class="result" hidden></section>
     </main>
 
-    <script type="module" src="/admin.js?v=20260602d"></script>
+    <script type="module" src="/admin.js?v=20260606a"></script>
   </body>
 </html>

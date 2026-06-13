@@ -16,6 +16,7 @@ const files = [
   "api/livechat-webhook.js",
   "lib/account-store.js",
   "lib/ai-training.js",
+  "lib/safe-template-replies.js",
   "lib/remote-config.js",
   "lib/jira.js",
   "lib/slack.js",
@@ -26,7 +27,9 @@ const files = [
   "scripts/extract-support10-response-candidates.mjs",
   "scripts/curate-support10-response-candidates.mjs",
   "scripts/integrate-approved-support10-templates.mjs",
+  "scripts/mine-livechat-conversation-flows.mjs",
   "scripts/test-support10-template-integration.mjs",
+  "scripts/test-auto-safe-templates.mjs",
   "docs/livechat-console-checklist.md",
   "docs/plan-soporte-livechat-app.md",
   "docs/betxico-soporte-knowledge.md",
@@ -43,6 +46,7 @@ JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
 JSON.parse(readFileSync(new URL("../docs/support-remote-config.example.json", import.meta.url), "utf8"));
 JSON.parse(readFileSync(new URL("../docs/betxico_intents_dataset_v1.json", import.meta.url), "utf8"));
+JSON.parse(readFileSync(new URL("../docs/betxico_fallback_templates_v1.json", import.meta.url), "utf8"));
 if (readFileSync(new URL("../tmp/livechat-response-mining/plantillas_aprobadas_soporte10_v1.json", import.meta.url), "utf8")) {
   JSON.parse(readFileSync(new URL("../tmp/livechat-response-mining/plantillas_aprobadas_soporte10_v1.json", import.meta.url), "utf8"));
 }

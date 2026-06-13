@@ -11,7 +11,13 @@
     "ai:extract-support10": "node scripts/extract-support10-response-candidates.mjs",
     "ai:curate-support10": "node scripts/curate-support10-response-candidates.mjs",
     "ai:integrate-support10": "node scripts/integrate-approved-support10-templates.mjs",
+    "ai:mine-flows": "node scripts/mine-livechat-conversation-flows.mjs",
     "ai:test-support10-templates": "node scripts/test-support10-template-integration.mjs",
+    "ai:test-auto-safe-templates": "node scripts/test-auto-safe-templates.mjs",
     "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "pdfjs-dist": "^4.10.38"
   }
 }

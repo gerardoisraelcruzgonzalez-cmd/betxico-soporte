@@ -2110,6 +2110,153 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.traceability-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 14px;
+}
+
+.traceability-header,
+.traceability-actions,
+.traceability-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.traceability-header h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.traceability-header p,
+.traceability-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.traceability-status[data-type="success"] {
+  color: #8be5c7;
+}
+
+.traceability-status[data-type="error"] {
+  color: #ff9b9b;
+}
+
+.traceability-input-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+}
+
+.traceability-input-grid textarea {
+  min-height: 132px;
+}
+
+.traceability-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.traceability-summary {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.traceability-summary span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.traceability-results {
+  display: grid;
+  gap: 14px;
+}
+
+.traceability-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.traceability-table-title {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.traceability-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.traceability-table th,
+.traceability-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.traceability-table th {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--muted);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.traceability-table td {
+  color: var(--text);
+}
+
+.traceability-empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 12px;
+  font-size: 12px;
+}
+
+.traceability-card-row dd {
+  display: grid;
+  gap: 2px;
+}
+
+.traceability-card-match,
+.traceability-card-mismatch {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.traceability-card-match {
+  background: rgba(139, 229, 199, 0.2);
+  color: #8be5c7;
+}
+
+.traceability-card-mismatch {
+  background: rgba(255, 155, 155, 0.18);
+  color: #ff9b9b;
+}
+
 .quick-deposit-preview {
   display: grid;
   gap: 8px;
@@ -3388,4 +3535,90 @@ body[data-auth="authenticated"] .ai-chat-output.error {
 
 body[data-auth="authenticated"] .ai-chat-output::before {
   display: none;
+}
+
+.customer-context {
+  grid-column: 1 / -1;
+}
+
+.customer-context-content {
+  margin-top: 14px;
+}
+
+.customer-context-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.customer-context-grid > section {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(8, 18, 14, 0.38);
+  backdrop-filter: blur(18px);
+}
+
+.customer-context-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.customer-context-heading span {
+  min-width: 24px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(77, 208, 156, 0.2);
+  color: #c8ffe8;
+  text-align: center;
+  font-size: 12px;
+}
+
+.customer-context-item {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(0, 0, 0, 0.24);
+  color: inherit;
+  text-decoration: none;
+}
+
+.customer-context-item b {
+  color: #f3fff9;
+  font-size: 12px;
+}
+
+.customer-context-item b.is-approved {
+  color: #9ff3be;
+}
+
+.customer-context-item b.is-documents {
+  color: #ffe28a;
+}
+
+.customer-context-item b.is-rejected {
+  color: #ffb3b3;
+}
+
+.customer-context-item span,
+.customer-context-empty {
+  margin: 0;
+  color: rgba(237, 250, 243, 0.75);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.customer-context > .secondary-button {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .customer-context-grid {
+    grid-template-columns: 1fr;
+  }
 }

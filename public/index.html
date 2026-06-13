@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Soporte Betxico</title>
-    <link rel="stylesheet" href="/styles.css?v=20260602c">
+    <link rel="stylesheet" href="/styles.css?v=20260605a">
   </head>
   <body data-auth="loading">
     <main class="app-shell">
@@ -37,7 +37,7 @@
 
       <section id="listPanelWidget" class="list-panel-widget" hidden></section>
 
-      <button id="ticketTab" type="button" class="back-button">VOLVER AL BUSCADOR</button>
+      <button id="ticketTab" type="button" class="back-button">VOLVER AL CONTEXTO</button>
 
       <section class="customer-panel is-hidden">
         <label>
@@ -59,6 +59,20 @@
       </section>
 
       <section id="searchView" class="search-view app-view active">
+        <section id="customerContextPanel" class="customer-context form-card" aria-labelledby="customerContextTitle" hidden>
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path><path d="M8 17h7"></path></svg>
+            </span>
+            <div>
+              <h2 id="customerContextTitle">Contexto del cliente</h2>
+              <p id="customerContextStatus">Consultando historial operativo...</p>
+            </div>
+          </div>
+          <div id="customerContextContent" class="customer-context-content"></div>
+          <button id="refreshCustomerContextBtn" type="button" class="secondary-button">ACTUALIZAR CONTEXTO</button>
+        </section>
+
         <section class="quick-actions form-card" aria-labelledby="quickActionsTitle">
           <div class="section-heading">
             <span class="section-icon" aria-hidden="true">
@@ -73,6 +87,10 @@
             <button id="quickDepositBtn" type="button" class="quick-action-button">
               <span class="quick-action-icon" aria-hidden="true">$</span>
               Deposito no reflejado
+            </button>
+            <button id="traceabilityBtn" type="button" class="quick-action-button">
+              <span class="quick-action-icon" aria-hidden="true">↔</span>
+              Trazabilidad retiro/deposito
             </button>
           </div>
           <form id="quickDepositForm" class="quick-deposit-form" hidden>
@@ -160,7 +178,7 @@
           </div>
         </section>
 
-        <form id="searchForm" class="search-card form-card">
+        <form id="searchForm" class="search-card form-card" hidden>
           <div class="search-hero-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M10.8 18.6a7.8 7.8 0 1 1 0-15.6 7.8 7.8 0 0 1 0 15.6Z"></path><path d="m16.5 16.5 4.5 4.5"></path></svg>
           </div>
@@ -194,7 +212,7 @@
 
         <p class="privacy-note">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.9 8.5 7 10 4.1-1.5 7-5.5 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-5"></path></svg>
-          Utiliza el buscador para encontrar tickets existentes o crea uno nuevo si el cliente aún no tiene una incidencia registrada.
+          Revisa el contexto automático del cliente o crea un ticket nuevo si aún no tiene una incidencia registrada.
         </p>
       </section>
 
@@ -395,6 +413,7 @@
           </details>
           <div class="settings-actions span-2">
             <button id="saveAccountBtn" type="submit">Guardar configuración</button>
+            <button id="traceabilitySettingsBtn" type="button" class="secondary-button">Trazabilidad</button>
             <button id="logoutBtn" type="button" class="secondary-button">Cerrar sesión</button>
           </div>
         </form>
@@ -409,6 +428,42 @@
             </div>
           </details>
         </form>
+
+        <section id="traceabilityPanel" class="settings-card-simple traceability-panel span-2" hidden>
+          <div class="traceability-header">
+            <div>
+              <h2>Trazabilidad retiro/deposito</h2>
+              <p>Sube o pega la lista de depositos de Paybridge. Se compara el ultimo retiro reportado por agente contra el ultimo deposito del cliente.</p>
+            </div>
+            <button id="traceabilityCloseBtn" type="button" class="secondary-button">Cerrar</button>
+          </div>
+          <div class="traceability-input-grid">
+            <label>
+              <span class="field-label">Archivos de depositos</span>
+              <input id="traceabilityDepositFile" type="file" multiple accept=".csv,.txt,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain">
+            </label>
+            <label>
+              <span class="field-label">Depositos pegados</span>
+              <textarea id="traceabilityDepositText" rows="6" placeholder="Pega aqui el CSV de Paybridge si no quieres subir archivo."></textarea>
+            </label>
+            <label>
+              <span class="field-label">Archivo de retiros (opcional)</span>
+              <input id="traceabilityWithdrawalFile" type="file" accept=".csv,.txt,.json,.pdf,text/csv,text/plain,application/json,application/pdf">
+            </label>
+            <label>
+              <span class="field-label">Retiros pegados (opcional)</span>
+              <textarea id="traceabilityWithdrawalText" rows="6" placeholder="Si no subes retiros, se leen los retiros reportados en Slack."></textarea>
+            </label>
+          </div>
+          <div class="traceability-actions">
+            <button id="traceabilityRunBtn" type="button">Comparar cuentas</button>
+            <button id="traceabilityDownloadCsvBtn" type="button" class="secondary-button" disabled>Descargar CSV</button>
+            <button id="traceabilityDownloadExcelBtn" type="button" class="secondary-button" disabled>Descargar Excel</button>
+          </div>
+          <div id="traceabilityStatus" class="traceability-status">Esperando lista de depositos.</div>
+          <div id="traceabilitySummary" class="traceability-summary" hidden></div>
+          <div id="traceabilityResults" class="traceability-results"></div>
+        </section>
       </section>
 
       <section id="result" class="result" hidden></section>
@@ -424,6 +479,7 @@
     </section>
 
     <script src="https://unpkg.com/@livechat/agent-app-sdk@1.15.0/dist/agentapp.umd.min.js"></script>
-    <script type="module" src="/app.js?v=20260602b"></script>
+    <script src="/vendor/exceljs.min.js"></script>
+    <script type="module" src="/app.js?v=20260606b"></script>
   </body>
 </html>

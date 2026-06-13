@@ -9,6 +9,18 @@ const els = {
   alertsList: document.getElementById("alertsList"),
   routesList: document.getElementById("routesList"),
   aiExamplesList: document.getElementById("aiExamplesList"),
+  traceabilityEnabled: document.getElementById("traceabilityEnabled"),
+  traceabilityDepositFile: document.getElementById("traceabilityDepositFile"),
+  traceabilityDepositText: document.getElementById("traceabilityDepositText"),
+  parseTraceabilityBtn: document.getElementById("parseTraceabilityBtn"),
+  clearTraceabilityBtn: document.getElementById("clearTraceabilityBtn"),
+  traceabilityAdminSummary: document.getElementById("traceabilityAdminSummary"),
+  safeTemplateMode: document.getElementById("safeTemplateMode"),
+  liveChatAutomationEnabled: document.getElementById("liveChatAutomationEnabled"),
+  liveChatAutoWelcomeEnabled: document.getElementById("liveChatAutoWelcomeEnabled"),
+  liveChatWelcomeOncePerChat: document.getElementById("liveChatWelcomeOncePerChat"),
+  liveChatWelcomeAgents: document.getElementById("liveChatWelcomeAgents"),
+  liveChatWelcomeMessage: document.getElementById("liveChatWelcomeMessage"),
   aiEnabled: document.getElementById("aiEnabled"),
   aiBaseInstructions: document.getElementById("aiBaseInstructions"),
   aiBusinessContext: document.getElementById("aiBusinessContext"),
@@ -42,7 +54,7 @@ const slackFields = [
   ["createdAt", "Fecha"]
 ];
 
-let config = { adminEmails: [], authorizedUsers: [], supportAlerts: [], reportWorkflows: [], slackRoutes: [], aiAssistant: {} };
+let config = { adminEmails: [], authorizedUsers: [], supportAlerts: [], reportWorkflows: [], slackRoutes: [], aiAssistant: {}, liveChatAutomation: {}, traceability: {} };
 let aiExamples = [];
 let alertAcknowledgements = {};
 
@@ -105,6 +117,10 @@ els.addAiExampleBtn.addEventListener("click", () => {
   });
   render();
 });
+els.traceabilityDepositFile.addEventListener("change", handleTraceabilityFileChange);
+els.parseTraceabilityBtn.addEventListener("click", parseTraceabilityDepositsFromInput);
+els.clearTraceabilityBtn.addEventListener("click", clearTraceabilityDeposits);
+els.traceabilityEnabled.addEventListener("change", updateTraceabilityFromDom);
 els.saveBtn.addEventListener("click", saveConfig);
 els.reloadBtn.addEventListener("click", loadConfig);
 
@@ -138,12 +154,15 @@ async function loadConfig() {
 }
 
 function render() {
+  renderLiveChatAutomation();
+  renderTraceability();
   renderAiAssistant();
   els.workflowsList.innerHTML = (config.reportWorkflows || []).map(renderWorkflow).join("");
   els.usersList.innerHTML = (config.authorizedUsers || []).map(renderUser).join("");
   els.alertsList.innerHTML = (config.supportAlerts || []).map(renderAlert).join("");
   els.routesList.innerHTML = (config.slackRoutes || []).map(renderRoute).join("");
   els.aiExamplesList.innerHTML = (aiExamples || []).map(renderAiExample).join("");
+  bindLiveChatAutomationFields();
   bindAiFields();
   els.workflowsList.querySelectorAll("[data-workflow-index]").forEach((node) => {
     node.addEventListener("input", updateWorkflowsFromDom);
@@ -169,6 +188,44 @@ function render() {
   });
   els.aiExamplesList.querySelectorAll("[data-remove-ai-example]").forEach((button) => {
     button.addEventListener("click", removeAiExample);
+  });
+}
+
+function renderTraceability() {
+  const traceability = config.traceability || {};
+  const deposits = Array.isArray(traceability.deposits) ? traceability.deposits : [];
+  els.traceabilityEnabled.checked = traceability.enabled !== false;
+  els.traceabilityDepositText.value = "";
+  els.traceabilityAdminSummary.textContent = deposits.length
+    ? `${deposits.length} clientes con ultimo deposito cargado. Actualizado: ${traceability.updatedAt || "sin fecha"}.`
+    : "Sin depositos cargados.";
+}
+
+function renderLiveChatAutomation() {
+  const automation = config.liveChatAutomation || {};
+  const autoWelcome = automation.autoWelcome || {};
+  const mode = ["disabled", "suggest_only", "auto_send_safe"].includes(automation.safeTemplateMode)
+    ? automation.safeTemplateMode
+    : "suggest_only";
+  els.safeTemplateMode.value = mode;
+  els.liveChatAutomationEnabled.checked = automation.enabled !== false;
+  els.liveChatAutoWelcomeEnabled.checked = autoWelcome.enabled !== false;
+  els.liveChatWelcomeOncePerChat.checked = autoWelcome.oncePerChat !== false;
+  els.liveChatWelcomeAgents.value = (autoWelcome.onlyForAgents || []).join(", ");
+  els.liveChatWelcomeMessage.value = autoWelcome.message || "";
+}
+
+function bindLiveChatAutomationFields() {
+  [
+    els.safeTemplateMode,
+    els.liveChatAutomationEnabled,
+    els.liveChatAutoWelcomeEnabled,
+    els.liveChatWelcomeOncePerChat,
+    els.liveChatWelcomeAgents,
+    els.liveChatWelcomeMessage
+  ].forEach((node) => {
+    node.addEventListener("input", updateLiveChatAutomationFromDom);
+    node.addEventListener("change", updateLiveChatAutomationFromDom);
   });
 }
 
@@ -435,6 +492,258 @@ function updateRoutesFromDom() {
   }).filter((route) => route.id && (route.channelId || route.listId));
 }
 
+async function handleTraceabilityFileChange() {
+  const file = els.traceabilityDepositFile.files?.[0];
+  if (!file) return;
+  try {
+    els.traceabilityDepositText.value = await file.text();
+    showStatus(`Archivo cargado: ${file.name}. Da clic en Procesar depositos.`, "success");
+  } catch {
+    showStatus("No pude leer el archivo. Exporta Paybridge como CSV o copia y pega la tabla.", "error");
+  }
+}
+
+function parseTraceabilityDepositsFromInput() {
+  const text = els.traceabilityDepositText.value.trim();
+  if (!text) {
+    showStatus("Pega o sube primero el CSV de depositos.", "error");
+    return;
+  }
+
+  try {
+    const deposits = parseTraceabilityDeposits(text);
+    const latestDeposits = [...latestTraceabilityDepositByEmail(deposits).values()]
+      .sort((left, right) => left.email.localeCompare(right.email));
+    config.traceability = {
+      ...(config.traceability || {}),
+      enabled: els.traceabilityEnabled.checked,
+      deposits: latestDeposits,
+      updatedAt: new Date().toISOString()
+    };
+    els.traceabilityDepositText.value = "";
+    renderTraceability();
+    showStatus(`${latestDeposits.length} clientes con ultimo deposito listos para guardar. Da clic en Guardar cambios remotos.`, "success");
+  } catch (error) {
+    showStatus(`No pude procesar depositos: ${formatError(error.message)}`, "error");
+  }
+}
+
+function clearTraceabilityDeposits() {
+  config.traceability = {
+    ...(config.traceability || {}),
+    enabled: els.traceabilityEnabled.checked,
+    deposits: [],
+    updatedAt: new Date().toISOString()
+  };
+  els.traceabilityDepositText.value = "";
+  renderTraceability();
+  showStatus("Depositos limpiados. Da clic en Guardar cambios remotos para aplicar.", "success");
+}
+
+function updateTraceabilityFromDom() {
+  config.traceability = {
+    ...(config.traceability || {}),
+    enabled: els.traceabilityEnabled.checked,
+    deposits: Array.isArray(config.traceability?.deposits) ? config.traceability.deposits : [],
+    updatedAt: config.traceability?.updatedAt || ""
+  };
+}
+
+function parseTraceabilityDeposits(text) {
+  const rows = parseDelimitedRows(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(normalizeTraceabilityHeader);
+  const indexes = {
+    email: findTraceabilityColumn(headers, ["correo", "email", "cliente", "customeremail", "loginusuario", "usuario"]),
+    amount: findTraceabilityColumn(headers, ["monto", "importe", "amount", "valor", "cantidad"]),
+    sourceClabe: findTraceabilitySourceClabeColumn(headers),
+    createdAt: findTraceabilityColumn(headers, ["createdat", "created", "fecha", "fechadeposito", "fechadecreacion", "date"]),
+    depositorName: findTraceabilityColumn(headers, ["depositante", "nombredepositante", "nombre", "name", "sender", "ordenante"])
+  };
+
+  if (indexes.email < 0) throw new Error("deposit_csv_missing_email");
+  if (indexes.sourceClabe < 0) throw new Error("deposit_csv_missing_clabe");
+  if (indexes.createdAt < 0) throw new Error("deposit_csv_missing_date");
+
+  const deposits = rows.slice(1).map((row, index) => {
+    const createdAt = cellAt(row, indexes.createdAt);
+    return {
+      email: normalizeEmail(cellAt(row, indexes.email)),
+      depositAmount: normalizeMoneyText(cellAt(row, indexes.amount)),
+      depositClabe: normalizeClabe(cellAt(row, indexes.sourceClabe)),
+      depositDate: createdAt,
+      depositorName: cellAt(row, indexes.depositorName),
+      dateTs: parseTraceabilityDate(createdAt),
+      sourceRow: index + 2
+    };
+  }).filter((deposit) => deposit.email);
+
+  const invalidClabe = deposits.find((deposit) => !deposit.depositClabe);
+  if (invalidClabe) throw new Error(`deposit_csv_invalid_clabe_row_${invalidClabe.sourceRow}`);
+  const invalidDate = deposits.find((deposit) => !deposit.dateTs);
+  if (invalidDate) throw new Error(`deposit_csv_invalid_date_row_${invalidDate.sourceRow}`);
+  return deposits;
+}
+
+function latestTraceabilityDepositByEmail(deposits) {
+  const grouped = new Map();
+  for (const deposit of deposits) {
+    const current = grouped.get(deposit.email);
+    if (!current || deposit.dateTs > current.dateTs || (deposit.dateTs === current.dateTs && deposit.sourceRow > current.sourceRow)) {
+      grouped.set(deposit.email, deposit);
+    }
+  }
+  return grouped;
+}
+
+function parseDelimitedRows(text) {
+  const lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) return [];
+  const delimiter = detectDelimiter(lines[0]);
+  return lines.map((line) => splitDelimitedLine(line, delimiter));
+}
+
+function detectDelimiter(line) {
+  return ["\t", ";", ","]
+    .map((delimiter) => ({ delimiter, count: splitDelimitedLine(line, delimiter).length }))
+    .sort((a, b) => b.count - a.count)[0]?.delimiter || ",";
+}
+
+function splitDelimitedLine(line, delimiter) {
+  const cells = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function findTraceabilityColumn(headers, aliases) {
+  for (const alias of aliases) {
+    const exactIndex = headers.findIndex((header) => header === alias);
+    if (exactIndex >= 0) return exactIndex;
+  }
+  for (const alias of aliases) {
+    const fuzzyIndex = headers.findIndex((header) => header.includes(alias) || alias.includes(header));
+    if (fuzzyIndex >= 0) return fuzzyIndex;
+  }
+  return -1;
+}
+
+function findTraceabilitySourceClabeColumn(headers) {
+  const aliases = [
+    "clabeorigen",
+    "cuentaorigen",
+    "cuentadeorigen",
+    "originclabe",
+    "sourceclabe",
+    "sourceaccount",
+    "originaccount",
+    "clabeordenante",
+    "cuentaordenante"
+  ];
+  let explicit = aliases
+    .map((alias) => headers.findIndex((header) => header === alias))
+    .find((index) => index >= 0);
+  if (explicit == null) {
+    explicit = aliases
+      .map((alias) => headers.findIndex((header) => header.includes(alias)))
+      .find((index) => index >= 0);
+  }
+  if (explicit >= 0) return explicit;
+
+  const candidates = headers
+    .map((header, index) => ({ header, index }))
+    .filter(({ header }) => /clabe|cuenta|account/.test(header));
+  return candidates.length === 1 ? candidates[0].index : -1;
+}
+
+function cellAt(row, index) {
+  return index >= 0 ? String(row[index] || "").trim() : "";
+}
+
+function normalizeTraceabilityHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeMoneyText(value) {
+  return String(value || "").trim().replace(/^\$+/, "");
+}
+
+function normalizeClabe(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length === 18 ? digits : "";
+}
+
+function extractClabe(value) {
+  const candidates = String(value || "").match(/\b\d[\d\s-]{16,30}\d\b/g) || [];
+  for (const candidate of candidates) {
+    const clabe = normalizeClabe(candidate);
+    if (clabe) return clabe;
+  }
+  return "";
+}
+
+function parseTraceabilityDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+  const localMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (localMatch) {
+    const [, day, month, year, hour = "0", minute = "0", second = "0"] = localMatch;
+    const fullYear = Number(year.length === 2 ? `20${year}` : year);
+    const date = new Date(fullYear, Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+    if (
+      date.getFullYear() === fullYear &&
+      date.getMonth() === Number(month) - 1 &&
+      date.getDate() === Number(day)
+    ) {
+      return date.getTime();
+    }
+    return 0;
+  }
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function updateLiveChatAutomationFromDom() {
+  const previous = config.liveChatAutomation || {};
+  config.liveChatAutomation = {
+    ...previous,
+    enabled: els.liveChatAutomationEnabled.checked,
+    safeTemplateMode: els.safeTemplateMode.value,
+    autoWelcome: {
+      ...(previous.autoWelcome || {}),
+      enabled: els.liveChatAutoWelcomeEnabled.checked,
+      oncePerChat: els.liveChatWelcomeOncePerChat.checked,
+      onlyForAgents: els.liveChatWelcomeAgents.value.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean),
+      message: els.liveChatWelcomeMessage.value.trim()
+    }
+  };
+}
+
 function updateAiFromDom() {
   config.aiAssistant = {
     enabled: els.aiEnabled.checked,
@@ -498,6 +807,8 @@ async function saveConfig() {
   updateUsersFromDom();
   updateAlertsFromDom();
   updateRoutesFromDom();
+  updateTraceabilityFromDom();
+  updateLiveChatAutomationFromDom();
   updateAiFromDom();
   updateAiExamplesFromDom();
   try {

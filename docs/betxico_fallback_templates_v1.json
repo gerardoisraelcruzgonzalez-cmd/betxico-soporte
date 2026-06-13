@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-06-04T15:57:59.927Z",
+  "updatedAt": "2026-06-04T20:00:33.219Z",
   "project": "Betxico Soporte",
   "description": "Plantillas seguras aprobadas para fallback sin GPT.",
   "source": "tmp/livechat-response-mining/plantillas_aprobadas_soporte10_v1.json",
@@ -18,7 +18,12 @@
         "contraseña temporal",
         "me rechaza la contraseña",
         "cambiar contraseña",
-        "recuperar contraseña"
+        "recuperar contraseña",
+        "olvide mi contraseña",
+        "olvidé mi contraseña",
+        "olvide mi contrasena",
+        "perdi mi contraseña",
+        "perdi mi contrasena"
       ],
       "requiredData": [
         "correo registrado",
@@ -32,7 +37,8 @@
       ],
       "response": "Para ayudarte con el acceso, por favor enviame una captura del area de inicio de sesion donde se vea el correo que estas usando y el mensaje de error. Con eso validamos si el problema viene de la contraseña, el correo o la sesion.",
       "angryCustomerResponse": "Entiendo que es molesto no poder entrar. Para revisar el acceso correctamente necesito una captura del login con el correo usado y el mensaje de error. Asi evitamos darte una indicacion incorrecta.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "acceso_enlace_externo_navegador_integrado",
@@ -62,7 +68,8 @@
       ],
       "response": "Por favor cierra esa ventana y abre Betxico directamente desde Google Chrome o Safari escribiendo betxico.mx en la barra del navegador. Los enlaces abiertos desde Facebook, Instagram u otros navegadores integrados pueden generar errores de sesion o carga.",
       "angryCustomerResponse": "Entiendo que el error es incomodo. Para descartar que venga del navegador integrado, abre Betxico directamente desde Chrome o Safari escribiendo betxico.mx. Si el problema continua desde ahi, envianos captura del error.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "bono_10_casino_activacion",
@@ -91,7 +98,8 @@
       ],
       "response": "Para activar la promocion del 10% en casino, realiza un deposito que cumpla el monto minimo vigente y despues entra al apartado de Promociones para activar el bono antes de jugar o apostar. Es importante activarlo antes de usar el saldo, porque si juegas primero el beneficio puede dejar de aplicar sobre ese deposito.",
       "angryCustomerResponse": "Entiendo la molestia. Esta promocion requiere activarse desde Promociones antes de jugar o apostar con el saldo. Si el saldo se uso antes de activar el bono, el beneficio puede dejar de aplicar conforme a las reglas de la promocion.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": false
     },
     {
       "intent": "bono_no_disponible_cashback_lealtad",
@@ -120,7 +128,8 @@
       ],
       "response": "Por el momento no contamos con ese bono o beneficio disponible para tu cuenta. Si en el futuro se activa una promocion aplicable, podras verla directamente desde el apartado de Promociones dentro de tu cuenta.",
       "angryCustomerResponse": "Entiendo que esperabas un beneficio adicional. En este momento no contamos con ese bono disponible para tu cuenta, por lo que no podemos prometerlo ni aplicarlo como excepcion. Cualquier promocion vigente aparecera directamente en Promociones.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "bono_primer_deposito_condiciones",
@@ -149,7 +158,8 @@
       ],
       "response": "El bono de primer deposito aplica cuando el primer deposito cumple el monto minimo requerido en una sola operacion y conforme a las condiciones vigentes. Si el deposito se realizo en montos separados, ya existia un deposito previo o no cumple las condiciones, el sistema puede no activar el bono.",
       "angryCustomerResponse": "Entiendo que esperabas recibir el bono. Para revisarlo correctamente necesitamos validar el primer deposito y que haya cumplido las condiciones de la promocion en una sola operacion. Si no cumple esas condiciones, no seria posible activarlo manualmente sin validacion interna.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "bono_sin_deposito_no_disponible",
@@ -178,7 +188,8 @@
       ],
       "response": "Por el momento no contamos con bono sin deposito o bono gratis por registro. La promocion disponible aplica con deposito conforme a las condiciones vigentes dentro de la plataforma. Si aparece alguna promocion aplicable para tu cuenta, podras verla directamente en el apartado de Promociones.",
       "angryCustomerResponse": "Entiendo la duda. Actualmente no tenemos activo un bono sin deposito o bono gratis por registro, por lo que no seria correcto prometerte un beneficio que no esta disponible. Te recomendamos revisar el apartado de Promociones para validar las ofertas vigentes aplicables a tu cuenta.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "deposito_comprobante_no_sustituye_cep",
@@ -193,7 +204,11 @@
         "no tengo cep",
         "solo tengo captura",
         "comprobante bancario",
-        "no me da cep"
+        "no me da cep",
+        "donde saco el cep",
+        "dónde saco el cep",
+        "como obtengo el cep",
+        "como saco el cep"
       ],
       "requiredData": [
         "comprobante bancario",
@@ -209,7 +224,8 @@
       ],
       "response": "El comprobante bancario ayuda a revisar la operacion, pero no sustituye el CEP de Banxico. El CEP es el documento que confirma el estado real del SPEI. Si aun no aparece disponible, intenta consultarlo mas tarde y compartelo en PDF junto con la clave de rastreo para continuar la validacion.",
       "angryCustomerResponse": "Entiendo que ya tienes un comprobante, pero para validar correctamente un SPEI necesitamos el CEP de Banxico o la clave de rastreo. Ese documento permite confirmar si la operacion fue liquidada, rechazada o sigue pendiente.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "deposito_saldo_visible_en_juego",
@@ -239,7 +255,8 @@
       ],
       "response": "Por favor ingresa a cualquier juego de casino y revisa si dentro del juego aparece tu saldo disponible. En ocasiones el saldo puede tardar en sincronizarse correctamente en la pantalla principal. Despues de entrar, sal del juego y revisa nuevamente tu saldo en la cuenta. Quedo atento a lo que te aparezca.",
       "angryCustomerResponse": "Entiendo la molestia. Para confirmar si es un tema de sincronizacion visual, necesitamos validar si el saldo aparece dentro de un juego de casino. Ingresa a cualquier juego, revisa el saldo disponible y despues vuelve a la pantalla principal para confirmar si se actualiza.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": false
     },
     {
       "intent": "deposito_spei_no_reflejado_pedir_cep",
@@ -269,7 +286,8 @@
       ],
       "response": "Con gusto te apoyo. Para revisar tu deposito, por favor comparteme el CEP de Banxico o la clave de rastreo de la transferencia, junto con el monto y la hora aproximada en la que realizaste el movimiento. Con esa informacion podremos validar correctamente el estatus del pago.",
       "angryCustomerResponse": "Entiendo la molestia. Para revisarlo correctamente necesitamos validar el movimiento con el CEP o la clave de rastreo, ya que ese dato permite confirmar el estado real de la transferencia. Por favor compartemelo y con gusto lo revisamos.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": true
     },
     {
       "intent": "kyc_pedir_ine_ambos_lados",
@@ -298,7 +316,8 @@
       ],
       "response": "Para continuar con la verificacion, por favor comparte fotografia clara y legible de tu INE por ambos lados. Asegurate de que los datos se vean completos, sin recortes, reflejos o partes borrosas.",
       "angryCustomerResponse": "Entiendo que el proceso puede ser incomodo, pero la verificacion es necesaria para proteger tu cuenta. Envia tu INE por ambos lados de forma clara y legible para poder continuar la revision.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": false
     },
     {
       "intent": "kyc_pedir_selfie_sosteniendo_ine",
@@ -327,7 +346,8 @@
       ],
       "response": "Para completar la validacion, por favor envia una selfie clara sosteniendo tu INE junto a tu rostro. Deben verse completos tu rostro y el documento, sin ediciones, reflejos o partes borrosas.",
       "angryCustomerResponse": "Entiendo la molestia. Esta selfie se solicita para confirmar que el tramite lo realiza el titular de la cuenta. Por favor compartela de forma clara sosteniendo tu INE junto a tu rostro.",
-      "source": "support10_curated_v1"
+      "source": "support10_curated_v1",
+      "auto_send_allowed": false
     }
   ]
 }

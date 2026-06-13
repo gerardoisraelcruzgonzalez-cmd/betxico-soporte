@@ -49,6 +49,23 @@ const elements = {
   quickDepositAttachmentList: document.getElementById("quickDepositAttachmentList"),
   quickDepositCancelBtn: document.getElementById("quickDepositCancelBtn"),
   quickDepositSubmitBtn: document.getElementById("quickDepositSubmitBtn"),
+  customerContextPanel: document.getElementById("customerContextPanel"),
+  customerContextStatus: document.getElementById("customerContextStatus"),
+  customerContextContent: document.getElementById("customerContextContent"),
+  refreshCustomerContextBtn: document.getElementById("refreshCustomerContextBtn"),
+  traceabilityBtn: document.getElementById("traceabilityBtn"),
+  traceabilityPanel: document.getElementById("traceabilityPanel"),
+  traceabilityCloseBtn: document.getElementById("traceabilityCloseBtn"),
+  traceabilityDepositFile: document.getElementById("traceabilityDepositFile"),
+  traceabilityDepositText: document.getElementById("traceabilityDepositText"),
+  traceabilityWithdrawalFile: document.getElementById("traceabilityWithdrawalFile"),
+  traceabilityWithdrawalText: document.getElementById("traceabilityWithdrawalText"),
+  traceabilityRunBtn: document.getElementById("traceabilityRunBtn"),
+  traceabilityDownloadCsvBtn: document.getElementById("traceabilityDownloadCsvBtn"),
+  traceabilityDownloadExcelBtn: document.getElementById("traceabilityDownloadExcelBtn"),
+  traceabilityStatus: document.getElementById("traceabilityStatus"),
+  traceabilitySummary: document.getElementById("traceabilitySummary"),
+  traceabilityResults: document.getElementById("traceabilityResults"),
   aiAssistantPanel: document.getElementById("aiAssistantPanel"),
   aiChatForm: document.getElementById("aiChatForm"),
   aiChatInput: document.getElementById("aiChatInput"),
@@ -80,6 +97,7 @@ const elements = {
   reporterAccountId: document.getElementById("reporterAccountId"),
   defaultAssigneeAccountId: document.getElementById("defaultAssigneeAccountId"),
   defaultLabels: document.getElementById("defaultLabels"),
+  traceabilitySettingsBtn: document.getElementById("traceabilitySettingsBtn"),
   slackUserConnectBtn: document.getElementById("slackUserConnectBtn"),
   slackUserStatus: document.getElementById("slackUserStatus"),
   logoutBtn: document.getElementById("logoutBtn"),
@@ -109,7 +127,7 @@ let currentAccount = null;
 let searchTickets = [];
 let searchSlackPanels = [];
 let pendingCustomerPrefill = null;
-let supportConfig = { slackRoutes: [], listPanels: [], liveChatAutomation: null };
+let supportConfig = { slackRoutes: [], listPanels: [], liveChatAutomation: null, traceability: null };
 let activeProfileKey = "";
 let currentReplyMatches = [];
 let activeListPanelId = "";
@@ -122,6 +140,13 @@ let activeAgentAlert = null;
 let supportConfigPollId = null;
 let lastSupportConfigCheckAt = 0;
 let autoWelcomeAttempts = new Set();
+let traceabilityReport = null;
+let autoSafeTemplateAttempts = new Map();
+let customerContextRequestId = 0;
+let searchRequestId = 0;
+
+const TRACEABILITY_DEPOSIT_TEXT_KEY = "betxico.traceability.depositText";
+const TRACEABILITY_WITHDRAWAL_TEXT_KEY = "betxico.traceability.withdrawalText";
 
 const QUICK_REPLIES = [
   {
@@ -334,12 +359,24 @@ function initialize() {
   elements.quickDepositCancelBtn?.addEventListener("click", handleQuickDepositCancel);
   elements.quickDepositTrackingKey?.addEventListener("input", renderQuickDepositPreview);
   elements.quickDepositAmount?.addEventListener("input", renderQuickDepositPreview);
+  elements.traceabilityBtn?.addEventListener("click", handleTraceabilityOpen);
+  elements.traceabilityCloseBtn?.addEventListener("click", handleTraceabilityClose);
+  elements.traceabilityRunBtn?.addEventListener("click", handleTraceabilityRun);
+  elements.traceabilityDownloadCsvBtn?.addEventListener("click", handleTraceabilityDownloadCsv);
+  elements.traceabilityDownloadExcelBtn?.addEventListener("click", handleTraceabilityDownloadExcel);
+  elements.traceabilityDepositFile?.addEventListener("change", handleTraceabilityFileChange);
+  elements.traceabilityWithdrawalFile?.addEventListener("change", handleTraceabilityWithdrawalFileChange);
+  elements.traceabilityDepositText?.addEventListener("input", resetTraceabilityReport);
+  elements.traceabilityWithdrawalText?.addEventListener("input", resetTraceabilityReport);
+  elements.traceabilitySettingsBtn?.addEventListener("click", handleTraceabilityOpen);
+  restoreTraceabilityDraft();
   elements.aiChatForm?.addEventListener("submit", handleAiChatSubmit);
   elements.aiCopyBtn?.addEventListener("click", handleAiCopy);
   elements.aiClearBtn?.addEventListener("click", handleAiClear);
   elements.aiSaveGoodBtn?.addEventListener("click", handleAiSaveGood);
   elements.aiBadBtn?.addEventListener("click", handleAiBad);
   elements.sendWelcomeBtn?.addEventListener("click", () => sendLiveChatWelcome({ manual: true }));
+  elements.refreshCustomerContextBtn?.addEventListener("click", () => loadCustomerContext({ force: true }));
   elements.quickDepositEvidence?.addEventListener("click", () => {
     elements.quickDepositEvidence.focus();
     elements.attachmentInput.click();
@@ -670,7 +707,8 @@ async function loadSupportConfig() {
     supportConfig = {
       slackRoutes: data.config?.slackRoutes || supportConfig.slackRoutes || [],
       listPanels: data.config?.listPanels || supportConfig.listPanels || [],
-      liveChatAutomation: data.config?.liveChatAutomation || supportConfig.liveChatAutomation || null
+      liveChatAutomation: data.config?.liveChatAutomation || supportConfig.liveChatAutomation || null,
+      traceability: data.config?.traceability || supportConfig.traceability || null
     };
     setReportWorkflows(data.config?.reportWorkflows || []);
     renderListPanelTabs();
@@ -687,7 +725,8 @@ async function loadPublicSupportConfig() {
     supportConfig = {
       slackRoutes: data.slackRoutes || [],
       listPanels: data.listPanels || [],
-      liveChatAutomation: data.liveChatAutomation || null
+      liveChatAutomation: data.liveChatAutomation || null,
+      traceability: data.traceability || null
     };
     setReportWorkflows(data.reportWorkflows || []);
     pendingAgentAlerts = Array.isArray(data.activeAlerts) ? data.activeAlerts : [];
@@ -695,6 +734,9 @@ async function loadPublicSupportConfig() {
     renderLiveChatAutomationPanel();
     renderListPanelTabs();
     renderDestinationMode();
+    if (elements.chatId.value.trim()) {
+      loadCustomerContext().catch(() => null);
+    }
   } catch {}
 }
 
@@ -879,6 +921,7 @@ function renderListPanelItems(panel, items) {
 }
 
 function renderListPanelCard(item) {
+  const trace = resolveCardTraceability(item);
   const meta = [
     item.reviewTopic,
     item.amount ? `$${item.amount}` : "",
@@ -903,11 +946,43 @@ function renderListPanelCard(item) {
         ${item.email ? `<div><dt>Correo</dt><dd>${escapeHtml(item.email)}</dd></div>` : ""}
         ${item.authId ? `<div><dt>AUTH ID</dt><dd>${escapeHtml(item.authId)}</dd></div>` : ""}
         ${item.assignedPerson ? `<div><dt>Asignado</dt><dd>${escapeHtml(item.assignedPerson)}</dd></div>` : ""}
+        ${trace ? `<div class="traceability-card-row"><dt>cuentaclabe</dt><dd>${renderTraceabilityCardValue(trace)}</dd></div>` : ""}
       </dl>
       ${kycSummary.length ? `<p class="list-panel-meta">${escapeHtml(kycSummary.join(" · "))}</p>` : ""}
       <p class="list-panel-detail">${escapeHtml(truncateText(item.detail, 180))}</p>
       ${item.jiraUrl ? `<a class="list-panel-link" href="${escapeHtml(item.jiraUrl)}" target="_blank" rel="noreferrer">Abrir Jira</a>` : ""}
     </article>
+  `;
+}
+
+function resolveCardTraceability(item) {
+  if (supportConfig.traceability?.enabled === false) return null;
+  const email = normalizeTraceabilityEmail(item.email);
+  const withdrawalClabe = normalizeTraceabilityClabe(item.withdrawalClabe || extractTraceabilityClabe(item.detail));
+  if (!email || !withdrawalClabe) return null;
+  const deposits = Array.isArray(supportConfig.traceability?.deposits) ? supportConfig.traceability.deposits : [];
+  const deposit = deposits
+    .filter((entry) => normalizeTraceabilityEmail(entry.email) === email)
+    .sort((left, right) => Number(right.dateTs || 0) - Number(left.dateTs || 0))[0];
+  if (!deposit?.depositClabe) return null;
+  const depositClabe = normalizeTraceabilityClabe(deposit.depositClabe);
+  if (!depositClabe) return null;
+  const same = withdrawalClabe === depositClabe;
+  return {
+    same,
+    withdrawalClabe,
+    depositClabe
+  };
+}
+
+function renderTraceabilityCardValue(trace) {
+  if (trace.same) {
+    return `<span class="traceability-card-match">misma cuenta</span> <span>${escapeHtml(trace.withdrawalClabe)}</span>`;
+  }
+  return `
+    <span class="traceability-card-mismatch">cuenta diferente</span>
+    <span>retiro: ${escapeHtml(trace.withdrawalClabe)}</span>
+    <span>deposito: ${escapeHtml(trace.depositClabe)}</span>
   `;
 }
 
@@ -1056,6 +1131,8 @@ function handleCustomerProfile(profile) {
   applyDefaultTicketSearch({ force: true });
   if (elements.replyInput) loadChatMessagesForSuggestion();
   maybeSendLiveChatWelcome();
+  scheduleLiveChatSafeTemplateCheck(4500);
+  window.setTimeout(() => loadCustomerContext().catch(() => null), 800);
   renderDestinationMode();
 }
 
@@ -1072,6 +1149,168 @@ function renderLiveChatAutomationPanel() {
   renderLiveChatAutomationStatus(elements.chatId?.value ? "Listo para enviar bienvenida." : "Esperando chat activo.");
 }
 
+async function loadCustomerContext({ force = false } = {}) {
+  if (!currentAccount || !elements.customerContextPanel) return;
+  const email = elements.customerEmail.value.trim().toLowerCase();
+  const authId = elements.authId.value.trim();
+  const chatId = elements.chatId.value.trim();
+  const query = email || authId;
+  if (!query && !chatId) {
+    elements.customerContextPanel.hidden = true;
+    return;
+  }
+
+  const requestId = ++customerContextRequestId;
+  elements.customerContextPanel.hidden = false;
+  elements.customerContextStatus.textContent = "Consultando Jira y conversaciones anteriores...";
+  elements.customerContextContent.innerHTML = '<p class="search-state">Cargando contexto operativo...</p>';
+  elements.refreshCustomerContextBtn.disabled = true;
+
+  const jiraPromise = query ? fetchJson(`/api/jira-search?query=${encodeURIComponent(query)}`) : Promise.resolve({ tickets: [] });
+  const historyPromise = fetchJson("/api/support-ticket?action=livechat-customer-history", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, chatId, limit: force ? 100 : 60 })
+    });
+
+  const [jiraResult, historyResult] = await Promise.allSettled([
+    jiraPromise,
+    historyPromise
+  ]);
+  if (requestId !== customerContextRequestId) return;
+
+  const jira = jiraResult.status === "fulfilled"
+    ? (jiraResult.value.tickets || []).filter(isOpenJiraTicket)
+    : [];
+  const history = historyResult?.status === "fulfilled" ? historyResult.value.history || [] : [];
+  // Si el registro coincide por cliente, debe mostrarse aunque la fila de Slack
+  // venga clasificada como "OTROS" o no incluya literalmente la palabra retiro.
+  const withdrawalItems = [];
+  const devwalletItems = jira.filter((ticket) => ticket.devwallet);
+  const errors = [jiraResult, historyResult].filter((result) => result.status === "rejected").length;
+
+  elements.customerContextStatus.textContent = [
+    `${jira.length} Jira`,
+    `${devwalletItems.length} DevWallet`,
+    `${withdrawalItems.length} reportes Slack`,
+    `${history.length} conversaciones previas`,
+    errors ? `${errors} consultas con error` : ""
+  ].filter(Boolean).join(" · ");
+  elements.customerContextContent.innerHTML = renderCustomerContext({ jira, devwalletItems, withdrawalItems, history });
+  elements.refreshCustomerContextBtn.disabled = false;
+  loadCustomerContextSlack({ requestId, query, jira, devwalletItems, history, errors }).catch(() => null);
+}
+
+async function loadCustomerContextSlack({ requestId, query, jira, devwalletItems, history, errors = 0 }) {
+  if (!query || requestId !== customerContextRequestId) return;
+  const panels = Array.isArray(supportConfig.listPanels) ? supportConfig.listPanels.filter((panel) => panel?.id) : [];
+  if (!panels.length) return;
+  elements.customerContextStatus.textContent = [
+    `${jira.length} Jira`,
+    `${devwalletItems.length} DevWallet`,
+    "Slack cargando",
+    `${history.length} conversaciones previas`,
+    errors ? `${errors} consultas con error` : ""
+  ].filter(Boolean).join(" · ");
+  const withdrawalItems = await fetchSlackPanelsForSearch(panels, query, { timeoutMs: 15000 });
+  if (requestId !== customerContextRequestId) return;
+  elements.customerContextStatus.textContent = [
+    `${jira.length} Jira`,
+    `${devwalletItems.length} DevWallet`,
+    `${withdrawalItems.reduce((total, panel) => total + (panel.items?.length || 0), 0)} reportes Slack`,
+    `${history.length} conversaciones previas`,
+    errors ? `${errors} consultas con error` : ""
+  ].filter(Boolean).join(" · ");
+  elements.customerContextContent.innerHTML = renderCustomerContext({
+    jira,
+    devwalletItems,
+    withdrawalItems: withdrawalItems.flatMap((panel) =>
+      (panel.items || []).map((item) => ({ ...item, panelLabel: panel.panel?.label || "Slack" }))
+    ),
+    history
+  });
+}
+
+function renderCustomerContext({ jira = [], devwalletItems = [], withdrawalItems = [], history = [] } = {}) {
+  return `
+    <div class="customer-context-grid">
+      <section>
+        <div class="customer-context-heading"><strong>Devolución Wallet</strong><span>${devwalletItems.length}</span></div>
+        ${devwalletItems.length ? devwalletItems.slice(0, 4).map((ticket) => {
+          const devwallet = ticket.devwallet || {};
+          return `
+          <a class="customer-context-item is-devwallet" href="${escapeHtml(ticket.url || "#")}" target="_blank" rel="noreferrer">
+            <b class="${escapeHtml(getDevWalletClass(devwallet.intent))}">${escapeHtml(devwallet.label || "Pendiente de clasificar")} · ${escapeHtml(ticket.key || "Ticket")}</b>
+            <span>${escapeHtml(truncateText(devwallet.description || ticket.summary || "Ticket de Devolución Wallet encontrado.", 150))}</span>
+            <span>${escapeHtml([ticket.status, `${ticket.commentsTotal || 0} comentarios`, devwallet.confidence ? `confianza ${devwallet.confidence}` : ""].filter(Boolean).join(" · "))}</span>
+          </a>
+        `;
+        }).join("") : '<p class="customer-context-empty">Sin Devolución Wallet clasificada.</p>'}
+      </section>
+      <section>
+        <div class="customer-context-heading"><strong>Jira</strong><span>${jira.length}</span></div>
+        ${jira.length ? jira.slice(0, 4).map((ticket) => `
+          <a class="customer-context-item" href="${escapeHtml(ticket.url || "#")}" target="_blank" rel="noreferrer">
+            <b>${escapeHtml(ticket.key || "Ticket")} · ${escapeHtml(ticket.status || "Sin estado")}</b>
+            <span>${escapeHtml(truncateText(ticket.summary || ticket.description || "Sin resumen", 130))}</span>
+          </a>
+        `).join("") : '<p class="customer-context-empty">Sin tickets encontrados.</p>'}
+      </section>
+      <section>
+        <div class="customer-context-heading"><strong>Reportes en Slack</strong><span>${withdrawalItems.length}</span></div>
+        ${withdrawalItems.length ? withdrawalItems.map((item) => {
+          const approval = formatContextSlackApproval(item.approvalStatus);
+          return `
+          <article class="customer-context-item">
+            <b class="${approval.className}">${escapeHtml(approval.label)} · ${escapeHtml(item.amount ? `$${item.amount}` : item.panelLabel || "Slack")}</b>
+            <span>${escapeHtml(truncateText([item.reviewTopic, item.detail].filter(Boolean).join(" · ") || "Reporte Slack encontrado.", 160))}</span>
+          </article>
+        `;
+        }).join("") : '<p class="customer-context-empty">Sin reportes Slack encontrados.</p>'}
+      </section>
+      <section>
+        <div class="customer-context-heading"><strong>Conversaciones anteriores</strong><span>${history.length}</span></div>
+        ${history.length ? history.slice(0, 3).map((chat) => `
+          <a class="customer-context-item" href="https://my.livechatinc.com/chats/${encodeURIComponent(chat.chatId || "")}" target="_blank" rel="noreferrer">
+            <b>${escapeHtml(chat.dateLabel || "Conversacion previa")}</b>
+            <span>${escapeHtml(truncateText(chat.summary || "Sin mensajes útiles.", 180))}</span>
+          </a>
+        `).join("") : '<p class="customer-context-empty">Sin conversaciones previas localizadas.</p>'}
+      </section>
+    </div>
+  `;
+}
+
+function getDevWalletClass(intent) {
+  if (intent === "devwallet1") return "is-approved";
+  if (intent === "devwallet2") return "is-rejected";
+  if (intent === "devwallet3") return "is-documents";
+  return "is-documents";
+}
+
+function isOpenJiraTicket(ticket = {}) {
+  const status = normalizeText(ticket.status || "");
+  if (!status) return true;
+  return !/\bcerrad|\bclosed\b|\bresuelt|\bresolved\b|\bcancelad|\bcanceled\b|\bcancelled\b|\bfinalizad|\bdone\b|\brechazad|\bdeclined\b/.test(status);
+}
+
+function formatContextSlackApproval(value) {
+  const normalized = normalizeText(value || "");
+  if (normalized === "aprobar" || normalized === "aprobado" || normalized === "approved") {
+    return { label: "APROBADO", className: "is-approved" };
+  }
+  if (normalized === "cancelar" || normalized === "cancelado" || normalized === "canceled" || normalized === "cancelled") {
+    return { label: "CANCELADO", className: "is-rejected" };
+  }
+  if (normalized === "pedir documentos") {
+    return { label: "PENDIENTE DE DOCUMENTOS", className: "is-documents" };
+  }
+  if (normalized === "advertencia") {
+    return { label: "ADVERTENCIA", className: "is-documents" };
+  }
+  return { label: value ? String(value).toUpperCase() : "SIN ESTATUS", className: "is-rejected" };
+}
+
 function maybeSendLiveChatWelcome() {
   const automation = supportConfig.liveChatAutomation;
   const autoWelcome = automation?.autoWelcome || {};
@@ -1080,6 +1319,60 @@ function maybeSendLiveChatWelcome() {
   if (!chatId || autoWelcomeAttempts.has(chatId)) return;
   autoWelcomeAttempts.add(chatId);
   sendLiveChatWelcome({ manual: false });
+}
+
+function scheduleLiveChatSafeTemplateCheck(delayMs = 3000) {
+  const chatId = elements.chatId.value.trim();
+  if (!chatId || !currentAccount) return;
+  if (supportConfig.liveChatAutomation?.enabled === false) return;
+  if (supportConfig.liveChatAutomation?.safeTemplateMode !== "auto_send_safe") return;
+  window.setTimeout(() => {
+    maybeSendLiveChatSafeTemplate().catch(() => null);
+  }, Math.max(1000, Number(delayMs) || 3000));
+}
+
+async function maybeSendLiveChatSafeTemplate() {
+  if (!currentAccount) return;
+  const automation = supportConfig.liveChatAutomation || {};
+  if (automation.enabled === false || automation.safeTemplateMode !== "auto_send_safe") return;
+
+  const chatId = elements.chatId.value.trim();
+  if (!chatId) return;
+
+  const attempts = Number(autoSafeTemplateAttempts.get(chatId) || 0);
+  if (attempts >= 6) return;
+  autoSafeTemplateAttempts.set(chatId, attempts + 1);
+
+  try {
+    const data = await fetchJson("/api/support-ticket?action=livechat-auto-safe-template", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chatId })
+    });
+
+    if (data.sent) {
+      renderLiveChatAutomationStatus(`Plantilla segura enviada: ${data.intent || "respuesta automatica"}.`);
+      return;
+    }
+    if (data.reason === "safe_template_already_sent") {
+      renderLiveChatAutomationStatus("Plantilla segura ya enviada en este chat.");
+      return;
+    }
+    if (data.reason === "no_useful_customer_message") {
+      renderLiveChatAutomationStatus("Esperando respuesta del cliente para detectar plantilla.");
+      scheduleLiveChatSafeTemplateCheck(10000);
+      return;
+    }
+    if (data.riskBlocked) {
+      renderLiveChatAutomationStatus("Caso delicado: queda para agente.", "error");
+      return;
+    }
+    if (data.skipped) {
+      renderLiveChatAutomationStatus("Sin plantilla segura para este mensaje.");
+    }
+  } catch (error) {
+    renderLiveChatAutomationStatus(`No pude revisar plantilla segura: ${formatError(error.message)}`, "error");
+  }
 }
 
 async function sendLiveChatWelcome({ manual = false } = {}) {
@@ -1108,6 +1401,7 @@ async function sendLiveChatWelcome({ manual = false } = {}) {
       return;
     }
     renderLiveChatAutomationStatus("Bienvenida enviada.");
+    scheduleLiveChatSafeTemplateCheck(8000);
     if (manual) showResult("Bienvenida enviada a LiveChat.", "success");
   } catch (error) {
     autoWelcomeAttempts.delete(chatId);
@@ -1137,14 +1431,15 @@ async function handleSearchTickets(event) {
 
   elements.searchTicketBtn.disabled = true;
   elements.searchTicketBtn.innerHTML = "BUSCANDO...";
-  elements.searchResults.innerHTML = '<p class="search-state">Buscando en Jira y listas de Slack...</p>';
+  elements.searchResults.innerHTML = '<p class="search-state">Buscando en Jira...</p>';
+  const requestId = ++searchRequestId;
 
   try {
+    const jiraResult = await Promise.resolve(fetchJson(`/api/jira-search?query=${encodeURIComponent(query)}`))
+      .then((value) => ({ status: "fulfilled", value }))
+      .catch((reason) => ({ status: "rejected", reason }));
     const panels = Array.isArray(supportConfig.listPanels) ? supportConfig.listPanels.filter((panel) => panel?.id) : [];
-    const [jiraResult, ...slackResults] = await Promise.allSettled([
-      fetchJson(`/api/jira-search?query=${encodeURIComponent(query)}`),
-      ...panels.map((panel) => fetchJson(`/api/slack-list-schema?mode=items&panel=${encodeURIComponent(panel.id)}&query=${encodeURIComponent(query)}`))
-    ]);
+    const slackResults = [];
 
     searchTickets = jiraResult.status === "fulfilled" ? jiraResult.value.tickets || [] : [];
     searchSlackPanels = slackResults
@@ -1165,7 +1460,8 @@ async function handleSearchTickets(event) {
             id: configPanel.id || "",
             label: configPanel.label || configPanel.id || "Lista Slack"
           },
-          items: result.value.items || []
+          items: result.value.items || [],
+          warning: result.value.warning || ""
         };
       });
 
@@ -1180,6 +1476,18 @@ async function handleSearchTickets(event) {
     });
 
     renderUnifiedSearchResults({ tickets: searchTickets, slackPanels: searchSlackPanels, errors });
+    if (requestId === searchRequestId && panels.length) {
+      elements.searchResults.insertAdjacentHTML("beforeend", '<p class="search-state" data-slack-loading>Buscando reportes en Slack...</p>');
+      fetchSlackPanelsForSearch(panels, query, { timeoutMs: 15000 }).then((panelResults) => {
+        if (requestId !== searchRequestId) return;
+        searchSlackPanels = panelResults;
+        renderUnifiedSearchResults({ tickets: searchTickets, slackPanels: searchSlackPanels, errors });
+      }).catch(() => {
+        if (requestId !== searchRequestId) return;
+        const loading = elements.searchResults.querySelector("[data-slack-loading]");
+        if (loading) loading.textContent = "Slack tardó demasiado; Jira ya está disponible.";
+      });
+    }
   } catch (error) {
     searchTickets = [];
     searchSlackPanels = [];
@@ -1188,6 +1496,42 @@ async function handleSearchTickets(event) {
     elements.searchTicketBtn.disabled = false;
     elements.searchTicketBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 18.6a7.8 7.8 0 1 1 0-15.6 7.8 7.8 0 0 1 0 15.6Z"></path><path d="m16.5 16.5 4.5 4.5"></path></svg>BUSCAR TICKET';
   }
+}
+
+async function fetchSlackPanelsForSearch(panels, query, { timeoutMs = 4500 } = {}) {
+  const results = [];
+  for (const panel of panels) {
+    const params = new URLSearchParams({
+      mode: "items",
+      panel: panel.id || ""
+    });
+    if (looksLikeEmail(query)) {
+      params.set("email", query);
+    } else {
+      params.set("query", query);
+    }
+    const result = await fetchJsonWithTimeout(
+      `/api/slack-list-schema?${params.toString()}`,
+      { timeoutMs }
+    )
+      .then((value) => ({
+        panel: value.panel || { id: panel.id || "", label: panel.label || panel.id || "Lista Slack" },
+        items: value.items || [],
+        warning: value.warning || ""
+      }))
+      .catch((error) => ({
+        panel: { id: panel.id || "", label: panel.label || panel.id || "Lista Slack" },
+        items: [],
+        warning: /timeout|ratelimited|rate/i.test(String(error.message || error)) ? "slack_unavailable" : "",
+        error: /timeout|ratelimited|rate/i.test(String(error.message || error)) ? "" : formatError(error.message || error)
+      }));
+    results.push(result);
+  }
+  return results;
+}
+
+function looksLikeEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function handleClearSearch() {
@@ -1222,6 +1566,761 @@ function handleQuickDepositCancel() {
 function updateQuickActionLayout() {
   const quickDepositOpen = Boolean(elements.quickDepositForm && !elements.quickDepositForm.hidden);
   elements.searchView?.classList.toggle("quick-action-expanded", quickDepositOpen);
+}
+
+function handleTraceabilityOpen() {
+  if (!ensureAuthenticated()) return;
+  if (elements.quickDepositForm) elements.quickDepositForm.hidden = true;
+  showView("settings");
+  elements.traceabilityPanel.hidden = false;
+  updateQuickActionLayout();
+  setTraceabilityStatus("Pega o sube el archivo de depositos de Paybridge para cruzarlo contra los retiros reportados.", "");
+  requestAnimationFrame(() => {
+    elements.traceabilityPanel?.scrollIntoView({ block: "start", behavior: "smooth" });
+    elements.traceabilityDepositText?.focus();
+  });
+}
+
+function handleTraceabilityClose() {
+  elements.traceabilityPanel.hidden = true;
+  hideResult();
+}
+
+async function handleTraceabilityFileChange() {
+  const files = [...(elements.traceabilityDepositFile?.files || [])];
+  if (!files.length) return;
+  try {
+    const texts = [];
+    for (const file of files) {
+      texts.push(await traceabilityFileToText(file));
+    }
+    elements.traceabilityDepositText.value = texts.filter(Boolean).join("\n");
+    resetTraceabilityReport();
+    saveTraceabilityDraft();
+    setTraceabilityStatus(`${files.length} archivo(s) de depositos cargados.`, "success");
+  } catch {
+    setTraceabilityStatus("No pude leer los depositos. Usa CSV, TXT o XLSX de Paybridge.", "error");
+  }
+}
+
+async function handleTraceabilityWithdrawalFileChange() {
+  const file = elements.traceabilityWithdrawalFile?.files?.[0];
+  if (!file) return;
+  try {
+    elements.traceabilityWithdrawalText.value = await traceabilityFileToText(file);
+    resetTraceabilityReport();
+    saveTraceabilityDraft();
+    setTraceabilityStatus(`Archivo de retiros cargado: ${file.name}`, "success");
+  } catch {
+    setTraceabilityStatus("No pude leer los retiros. Usa CSV, TXT, JSON o el PDF de saques.", "error");
+  }
+}
+
+async function traceabilityFileToText(file) {
+  const lowerName = String(file?.name || "").toLowerCase();
+  if (lowerName.endsWith(".xlsx")) {
+    if (!globalThis.ExcelJS) throw new Error("xlsx_reader_unavailable");
+    const workbook = new globalThis.ExcelJS.Workbook();
+    await workbook.xlsx.load(await file.arrayBuffer());
+    return workbook.worksheets
+      .map((worksheet) => worksheetToDelimitedText(worksheet))
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (lowerName.endsWith(".pdf")) {
+    const pdfjs = await import("/vendor/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.min.mjs";
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((item) => item.str || "").join(" "));
+    }
+    return pages.join("\n");
+  }
+  return file.text();
+}
+
+function worksheetToDelimitedText(worksheet) {
+  const lines = [];
+  worksheet.eachRow({ includeEmpty: false }, (row) => {
+    const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+    lines.push(values.map((value) => csvEscape(resolveSpreadsheetCellValue(value))).join(","));
+  });
+  return lines.join("\n");
+}
+
+function resolveSpreadsheetCellValue(value) {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") {
+    if (value.result != null) return value.result;
+    if (value.text != null) return value.text;
+    if (Array.isArray(value.richText)) return value.richText.map((part) => part.text || "").join("");
+  }
+  return String(value);
+}
+
+function resetTraceabilityReport() {
+  traceabilityReport = null;
+  saveTraceabilityDraft();
+  renderTraceabilityDownloadState(false);
+  if (elements.traceabilitySummary) {
+    elements.traceabilitySummary.hidden = true;
+    elements.traceabilitySummary.innerHTML = "";
+  }
+  if (elements.traceabilityResults) elements.traceabilityResults.innerHTML = "";
+}
+
+function restoreTraceabilityDraft() {
+  if (!elements.traceabilityDepositText) return;
+  try {
+    const draft = sessionStorage.getItem(TRACEABILITY_DEPOSIT_TEXT_KEY) || "";
+    if (draft && !elements.traceabilityDepositText.value) {
+      elements.traceabilityDepositText.value = draft;
+      setTraceabilityStatus("Lista de depositos cargada en esta sesion. Puedes volver a comparar.", "");
+    }
+    const withdrawalDraft = sessionStorage.getItem(TRACEABILITY_WITHDRAWAL_TEXT_KEY) || "";
+    if (withdrawalDraft && elements.traceabilityWithdrawalText && !elements.traceabilityWithdrawalText.value) {
+      elements.traceabilityWithdrawalText.value = withdrawalDraft;
+    }
+  } catch {}
+}
+
+function saveTraceabilityDraft() {
+  if (!elements.traceabilityDepositText) return;
+  try {
+    const text = elements.traceabilityDepositText.value || "";
+    if (text) sessionStorage.setItem(TRACEABILITY_DEPOSIT_TEXT_KEY, text);
+    else sessionStorage.removeItem(TRACEABILITY_DEPOSIT_TEXT_KEY);
+    const withdrawalText = elements.traceabilityWithdrawalText?.value || "";
+    if (withdrawalText) sessionStorage.setItem(TRACEABILITY_WITHDRAWAL_TEXT_KEY, withdrawalText);
+    else sessionStorage.removeItem(TRACEABILITY_WITHDRAWAL_TEXT_KEY);
+  } catch {}
+}
+
+async function handleTraceabilityRun() {
+  if (!ensureAuthenticated()) return;
+  hideResult();
+
+  const depositText = elements.traceabilityDepositText?.value?.trim() || "";
+  if (!depositText) {
+    setTraceabilityStatus("Pega o sube primero la lista de depositos de Paybridge.", "error");
+    return;
+  }
+
+  elements.traceabilityRunBtn.disabled = true;
+  elements.traceabilityRunBtn.textContent = "Comparando...";
+  renderTraceabilityDownloadState(false);
+  setTraceabilityStatus("Leyendo depositos y consultando retiros reportados...", "");
+
+  try {
+    const deposits = parseTraceabilityDeposits(depositText);
+    if (!deposits.length) {
+      throw new Error("No encontre depositos validos con correo en la lista.");
+    }
+
+    const withdrawalText = elements.traceabilityWithdrawalText?.value?.trim() || "";
+    const withdrawals = withdrawalText
+      ? parseTraceabilityWithdrawals(withdrawalText)
+      : await loadTraceabilityWithdrawals();
+    if (!withdrawals.length) {
+      throw new Error("No encontre retiros reportados con correo y CLABE detectada.");
+    }
+
+    traceabilityReport = buildTraceabilityReport(withdrawals, deposits);
+    renderTraceabilityReport(traceabilityReport);
+    renderTraceabilityDownloadState(true);
+    setTraceabilityStatus("Comparacion generada con el ultimo retiro y el ultimo deposito identificables por cliente.", "success");
+  } catch (error) {
+    resetTraceabilityReport();
+    setTraceabilityStatus(formatError(error.message), "error");
+  } finally {
+    elements.traceabilityRunBtn.disabled = false;
+    elements.traceabilityRunBtn.textContent = "Comparar cuentas";
+  }
+}
+
+async function loadTraceabilityWithdrawals() {
+  const panel = resolveTraceabilityPanel();
+  const query = new URLSearchParams({
+    mode: "items",
+    panel: panel.id,
+    limit: "1000"
+  });
+  const data = await fetchJson(`/api/slack-list-schema?${query.toString()}`);
+  return (data.items || [])
+    .map(normalizeTraceabilityWithdrawal)
+    .filter((item) => item.email && item.withdrawalClabe);
+}
+
+function resolveTraceabilityPanel() {
+  const panels = Array.isArray(supportConfig.listPanels) ? supportConfig.listPanels.filter((panel) => panel?.id) : [];
+  const panel = panels.find((item) => item.id === "revision")
+    || panels.find((item) => /revision|retiro|transaccion/i.test(`${item.id} ${item.label || ""}`))
+    || panels[0];
+  if (!panel) {
+    throw new Error("No hay una lista de Slack configurada para leer retiros reportados.");
+  }
+  return panel;
+}
+
+function normalizeTraceabilityWithdrawal(item) {
+  const dateValue = item.updatedAt || item.createdAt || "";
+  return {
+    name: item.customerName || item.name || "",
+    email: normalizeTraceabilityEmail(item.email),
+    withdrawalAmount: normalizeMoneyInput(item.amount || ""),
+    withdrawalClabe: normalizeTraceabilityClabe(item.withdrawalClabe || extractTraceabilityClabe(item.detail)),
+    withdrawalDate: dateValue,
+    dateTs: parseTraceabilityDate(dateValue),
+    sourceId: item.id || item.authId || ""
+  };
+}
+
+function parseTraceabilityDeposits(text) {
+  const rows = parseDelimitedRows(text);
+  if (rows.length < 2) return [];
+
+  const headers = rows[0].map(normalizeTraceabilityHeader);
+  const indexes = {
+    email: findTraceabilityColumn(headers, ["correo", "email", "cliente", "customeremail", "loginusuario", "usuario"]),
+    amount: findTraceabilityColumn(headers, ["monto", "importe", "amount", "valor", "cantidad"]),
+    sourceClabe: findTraceabilitySourceClabeColumn(headers),
+    createdAt: findTraceabilityColumn(headers, ["createdat", "created", "fecha", "fechadeposito", "fechadecreacion", "date"]),
+    depositorName: findTraceabilityColumn(headers, ["depositante", "nombredepositante", "nombre", "name", "sender", "ordenante"])
+  };
+
+  if (indexes.sourceClabe < 0) {
+    throw new Error("La lista de depositos no trae una columna CLABE origen identificable o trae varias columnas ambiguas.");
+  }
+  if (indexes.createdAt < 0) {
+    throw new Error("La lista de depositos no trae una columna de fecha identificable.");
+  }
+
+  const deposits = rows.slice(1).flatMap((row, index) => {
+    const repeatedHeader = normalizeTraceabilityHeader(cellAt(row, indexes.sourceClabe)) === headers[indexes.sourceClabe]
+      && normalizeTraceabilityHeader(cellAt(row, indexes.createdAt)) === headers[indexes.createdAt];
+    if (repeatedHeader) return [];
+    const createdAt = cellAt(row, indexes.createdAt);
+    return [{
+      name: cellAt(row, indexes.depositorName),
+      email: normalizeTraceabilityEmail(cellAt(row, indexes.email)),
+      nameKey: normalizeTraceabilityName(cellAt(row, indexes.depositorName)),
+      depositAmount: normalizeMoneyInput(cellAt(row, indexes.amount)),
+      depositClabe: normalizeTraceabilityClabe(cellAt(row, indexes.sourceClabe)),
+      depositDate: createdAt,
+      dateTs: parseTraceabilityDate(createdAt),
+      sourceRow: index + 2
+    }];
+  }).filter((item) => item.email || item.nameKey);
+
+  const invalidClabe = deposits.find((deposit) => !deposit.depositClabe);
+  if (invalidClabe) {
+    throw new Error(`La fila ${invalidClabe.sourceRow} no tiene una CLABE origen valida.`);
+  }
+  const invalidDate = deposits.find((deposit) => !deposit.dateTs);
+  if (invalidDate) {
+    throw new Error(`La fila ${invalidDate.sourceRow} tiene correo, pero no una fecha valida.`);
+  }
+  return deposits;
+}
+
+function parseTraceabilityWithdrawals(text) {
+  const jsonLike = parseTraceabilityWithdrawalJsonLike(text);
+  if (jsonLike.length) return jsonLike;
+
+  const rows = parseDelimitedRows(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(normalizeTraceabilityHeader);
+  const indexes = {
+    name: findTraceabilityColumn(headers, ["nombre", "name", "nomeusuario", "cliente"]),
+    lastName: findTraceabilityColumn(headers, ["apellido", "lastname", "sobrenomeusuario"]),
+    email: findTraceabilityColumn(headers, ["correo", "email", "loginusuario", "usuario"]),
+    amount: findTraceabilityColumn(headers, ["monto", "importe", "amount", "valor", "cantidad"]),
+    clabe: findTraceabilityColumn(headers, ["cuentaclabe", "claberetiro", "clabedestino", "withdrawalclabe"]),
+    createdAt: findTraceabilityColumn(headers, ["momentosolicitacao", "createdat", "created", "fecha", "fecharetiro", "date"]),
+    authId: findTraceabilityColumn(headers, ["idusuarioauth", "authid", "idautenticacion"])
+  };
+  if (indexes.email < 0 || indexes.clabe < 0 || indexes.createdAt < 0) {
+    throw new Error("El archivo de retiros no trae correo, cuentaClabe y fecha detectables.");
+  }
+  return rows.slice(1).map((row, index) => normalizeUploadedWithdrawal({
+    name: `${cellAt(row, indexes.name)} ${cellAt(row, indexes.lastName)}`.trim(),
+    email: cellAt(row, indexes.email),
+    withdrawalAmount: cellAt(row, indexes.amount),
+    withdrawalClabe: cellAt(row, indexes.clabe),
+    withdrawalDate: cellAt(row, indexes.createdAt),
+    sourceId: cellAt(row, indexes.authId) || String(index + 2)
+  })).filter((item) => item.email && item.withdrawalClabe && item.dateTs);
+}
+
+function parseTraceabilityWithdrawalJsonLike(text) {
+  const source = String(text || "").replace(/\\"/g, '"');
+  const starts = [...source.matchAll(/["']?id["']?\s*:\s*(\d+)/gi)];
+  const records = [];
+  starts.forEach((start, index) => {
+    const block = source.slice(start.index, starts[index + 1]?.index || source.length);
+    const value = (key) => {
+      const match = block.match(new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']*)["']`, "i"));
+      return match?.[1] || "";
+    };
+    const number = (key) => {
+      const match = block.match(new RegExp(`["']?${key}["']?\\s*:\\s*(\\d+)`, "i"));
+      return match?.[1] || "";
+    };
+    const clabe = block.match(/cuentaClabe\D{0,50}(\d{17,18})/i)?.[1] || "";
+    const item = normalizeUploadedWithdrawal({
+      name: `${value("nome_usuario")} ${value("sobrenome_usuario")}`.trim(),
+      email: value("login_usuario"),
+      withdrawalAmount: value("valor"),
+      withdrawalClabe: clabe,
+      withdrawalDate: value("momento_solicitacao"),
+      sourceId: number("id_usuario_auth") || start[1]
+    });
+    if (item.email && item.withdrawalClabe && item.dateTs) records.push(item);
+  });
+  return records;
+}
+
+function normalizeUploadedWithdrawal(item) {
+  return {
+    name: String(item.name || "").trim(),
+    nameKey: normalizeTraceabilityName(item.name),
+    email: normalizeTraceabilityEmail(item.email),
+    withdrawalAmount: normalizeMoneyInput(item.withdrawalAmount || ""),
+    withdrawalClabe: normalizeTraceabilityClabe(item.withdrawalClabe),
+    withdrawalDate: String(item.withdrawalDate || "").trim(),
+    dateTs: parseTraceabilityDate(item.withdrawalDate),
+    sourceId: String(item.sourceId || "").trim()
+  };
+}
+
+function buildTraceabilityReport(withdrawals, deposits) {
+  const latestWithdrawalByEmail = latestByEmail(withdrawals);
+  const latestDepositByEmail = latestByIdentity(deposits, (item) => item.email);
+  const latestDepositByName = latestByIdentity(deposits, (item) => item.nameKey);
+  const matched = [];
+  const unmatched = [];
+  const missingDeposit = [];
+
+  for (const withdrawal of latestWithdrawalByEmail.values()) {
+    const depositByEmail = latestDepositByEmail.get(withdrawal.email);
+    const deposit = depositByEmail || findUniqueDepositByName(withdrawal, latestDepositByName);
+    if (!deposit) {
+      missingDeposit.push(buildTraceabilityRow(withdrawal, null, "SIN DEPOSITO"));
+      continue;
+    }
+
+    const isMatch = Boolean(withdrawal.withdrawalClabe && deposit.depositClabe && withdrawal.withdrawalClabe === deposit.depositClabe);
+    const matchedNameTokens = countTraceabilityNameOverlap(withdrawal.name, deposit.name);
+    if (!isMatch && !depositByEmail && matchedNameTokens < 3) {
+      missingDeposit.push(buildTraceabilityRow(withdrawal, null, "SIN DEPOSITO"));
+      continue;
+    }
+    const row = buildTraceabilityRow(withdrawal, deposit, isMatch ? "SI" : "NO");
+    if (isMatch) matched.push(row);
+    else unmatched.push(row);
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    matched,
+    unmatched,
+    missingDeposit,
+    summary: {
+      withdrawalsRead: withdrawals.length,
+      depositsRead: deposits.length,
+      withdrawalsCompared: latestWithdrawalByEmail.size,
+      matched: matched.length,
+      unmatched: unmatched.length,
+      missingDeposit: missingDeposit.length
+    }
+  };
+}
+
+function countTraceabilityNameOverlap(left, right) {
+  const leftTokens = new Set(normalizeTraceabilityName(left).split(" ").filter(Boolean));
+  const rightTokens = new Set(normalizeTraceabilityName(right).split(" ").filter(Boolean));
+  return [...leftTokens].filter((token) => rightTokens.has(token)).length;
+}
+
+function findUniqueDepositByName(withdrawal, latestDepositByName) {
+  const withdrawalTokens = new Set(normalizeTraceabilityName(withdrawal.name).split(" ").filter(Boolean));
+  if (withdrawalTokens.size < 2) return null;
+  const candidates = [...latestDepositByName.values()].filter((deposit) => {
+    const depositTokens = new Set(String(deposit.nameKey || "").split(" ").filter(Boolean));
+    return [...withdrawalTokens].every((token) => depositTokens.has(token));
+  });
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function buildTraceabilityRow(withdrawal, deposit, matchLabel) {
+  return {
+    name: withdrawal.name || deposit?.name || "",
+    email: withdrawal.email,
+    withdrawalAmount: withdrawal.withdrawalAmount || "",
+    depositAmount: deposit?.depositAmount || "",
+    match: matchLabel,
+    withdrawalClabe: withdrawal.withdrawalClabe || "",
+    depositClabe: deposit?.depositClabe || "",
+    withdrawalDate: withdrawal.withdrawalDate || "",
+    depositDate: deposit?.depositDate || "",
+    depositorName: deposit?.name || ""
+  };
+}
+
+function latestByEmail(items) {
+  return latestByIdentity(items, (item) => item.email);
+}
+
+function latestByIdentity(items, identity) {
+  const grouped = new Map();
+  for (const item of items) {
+    const key = String(identity(item) || "").trim();
+    if (!key) continue;
+    const current = grouped.get(key);
+    if (!current || item.dateTs > current.dateTs || (item.dateTs === current.dateTs && String(item.sourceRow || item.sourceId || "") > String(current.sourceRow || current.sourceId || ""))) {
+      grouped.set(key, item);
+    }
+  }
+  return grouped;
+}
+
+function renderTraceabilityReport(report) {
+  elements.traceabilitySummary.hidden = false;
+  elements.traceabilitySummary.innerHTML = `
+    <span>Retiros comparados: ${report.summary.withdrawalsCompared}</span>
+    <span>Coinciden: ${report.summary.matched}</span>
+    <span>No coinciden: ${report.summary.unmatched}</span>
+    <span>Sin deposito: ${report.summary.missingDeposit}</span>
+  `;
+
+  elements.traceabilityResults.innerHTML = [
+    renderTraceabilityTable("Coinciden", report.matched, "No hay clientes con cuenta coincidente."),
+    renderTraceabilityTable("No coinciden", report.unmatched, "No hay clientes con cuenta distinta."),
+    renderTraceabilityTable("Sin deposito encontrado", report.missingDeposit, "Todos los retiros comparados tuvieron deposito en la lista.")
+  ].join("");
+}
+
+function renderTraceabilityTable(title, rows, emptyMessage) {
+  if (!rows.length) {
+    return `
+      <section>
+        <h4 class="traceability-table-title">${escapeHtml(title)}</h4>
+        <div class="traceability-empty">${escapeHtml(emptyMessage)}</div>
+      </section>
+    `;
+  }
+
+  return `
+    <section>
+      <h4 class="traceability-table-title">${escapeHtml(title)} (${rows.length})</h4>
+      <div class="traceability-table-wrap">
+        <table class="traceability-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Correo</th>
+              <th>Monto retiro</th>
+              <th>Monto deposito</th>
+              <th>Coincide cuenta</th>
+              <th>Cuenta a la que retira</th>
+              <th>Cuenta de la que deposita</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row) => `
+              <tr>
+                <td>${escapeHtml(row.name)}</td>
+                <td>${escapeHtml(row.email)}</td>
+                <td>${escapeHtml(row.withdrawalAmount)}</td>
+                <td>${escapeHtml(row.depositAmount)}</td>
+                <td>${escapeHtml(row.match)}</td>
+                <td>${escapeHtml(row.withdrawalClabe)}</td>
+                <td>${escapeHtml(row.depositClabe)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function handleTraceabilityDownloadCsv() {
+  if (!traceabilityReport) return;
+  const csv = buildTraceabilityCsv(traceabilityReport);
+  downloadTextFile(`trazabilidad-cuentas-${dateSlug()}.csv`, "text/csv;charset=utf-8", csv);
+}
+
+function handleTraceabilityDownloadExcel() {
+  if (!traceabilityReport) return;
+  const workbook = buildTraceabilityExcelXml(traceabilityReport);
+  downloadTextFile(`trazabilidad-cuentas-${dateSlug()}.xls`, "application/vnd.ms-excel;charset=utf-8", workbook);
+}
+
+function buildTraceabilityCsv(report) {
+  const header = ["seccion", ...traceabilityExportHeaders()];
+  const lines = [header.map(csvEscape).join(",")];
+  [
+    ["Coinciden", report.matched],
+    ["No coinciden", report.unmatched],
+    ["Sin deposito encontrado", report.missingDeposit]
+  ].forEach(([section, rows]) => {
+    rows.forEach((row) => {
+      lines.push([section, ...traceabilityExportValues(row)].map(csvEscape).join(","));
+    });
+  });
+  return `${lines.join("\n")}\n`;
+}
+
+function buildTraceabilityExcelXml(report) {
+  const sheets = [
+    ["Coinciden", report.matched],
+    ["No coinciden", report.unmatched],
+    ["Resumen", [
+      { metric: "Retiros leidos", value: report.summary.withdrawalsRead },
+      { metric: "Depositos leidos", value: report.summary.depositsRead },
+      { metric: "Retiros comparados", value: report.summary.withdrawalsCompared },
+      { metric: "Coinciden", value: report.summary.matched },
+      { metric: "No coinciden", value: report.summary.unmatched },
+      { metric: "Sin deposito encontrado", value: report.summary.missingDeposit }
+    ]],
+    ["Sin deposito encontrado", report.missingDeposit]
+  ];
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+${sheets.map(([name, rows]) => name === "Resumen" ? renderTraceabilitySummarySheet(name, rows) : renderTraceabilityDataSheet(name, rows)).join("\n")}
+</Workbook>`;
+}
+
+function renderTraceabilityDataSheet(name, rows) {
+  const headers = traceabilityExportHeaders();
+  return `<Worksheet ss:Name="${excelXmlEscape(name)}"><Table>
+<Row>${headers.map((header) => `<Cell><Data ss:Type="String">${excelXmlEscape(header)}</Data></Cell>`).join("")}</Row>
+${rows.map((row) => `<Row>${traceabilityExportValues(row).map((value) => `<Cell><Data ss:Type="String">${excelXmlEscape(value)}</Data></Cell>`).join("")}</Row>`).join("\n")}
+</Table></Worksheet>`;
+}
+
+function renderTraceabilitySummarySheet(name, rows) {
+  return `<Worksheet ss:Name="${excelXmlEscape(name)}"><Table>
+<Row><Cell><Data ss:Type="String">Metrica</Data></Cell><Cell><Data ss:Type="String">Valor</Data></Cell></Row>
+${rows.map((row) => `<Row><Cell><Data ss:Type="String">${excelXmlEscape(row.metric)}</Data></Cell><Cell><Data ss:Type="Number">${Number(row.value || 0)}</Data></Cell></Row>`).join("\n")}
+</Table></Worksheet>`;
+}
+
+function traceabilityExportHeaders() {
+  return [
+    "nombre",
+    "correo",
+    "monto retiro",
+    "monto deposito",
+    "coincide cuenta",
+    "cuenta a la que retira",
+    "cuenta de la que deposita",
+    "fecha retiro",
+    "fecha deposito",
+    "nombre depositante"
+  ];
+}
+
+function traceabilityExportValues(row) {
+  return [
+    row.name,
+    row.email,
+    row.withdrawalAmount,
+    row.depositAmount,
+    row.match,
+    row.withdrawalClabe,
+    row.depositClabe,
+    row.withdrawalDate,
+    row.depositDate,
+    row.depositorName
+  ];
+}
+
+function renderTraceabilityDownloadState(enabled) {
+  if (elements.traceabilityDownloadCsvBtn) elements.traceabilityDownloadCsvBtn.disabled = !enabled;
+  if (elements.traceabilityDownloadExcelBtn) elements.traceabilityDownloadExcelBtn.disabled = !enabled;
+}
+
+function setTraceabilityStatus(message, type = "") {
+  if (!elements.traceabilityStatus) return;
+  elements.traceabilityStatus.textContent = message || "";
+  elements.traceabilityStatus.dataset.type = type;
+}
+
+function parseDelimitedRows(text) {
+  const lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) return [];
+  const delimiter = detectDelimiter(lines[0]);
+  return lines.map((line) => splitDelimitedLine(line, delimiter));
+}
+
+function detectDelimiter(line) {
+  const candidates = ["\t", ";", ","];
+  return candidates
+    .map((delimiter) => ({ delimiter, count: splitDelimitedLine(line, delimiter).length }))
+    .sort((a, b) => b.count - a.count)[0]?.delimiter || ",";
+}
+
+function splitDelimitedLine(line, delimiter) {
+  const cells = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function findTraceabilityColumn(headers, aliases) {
+  for (const alias of aliases) {
+    const exactIndex = headers.findIndex((header) => header === alias);
+    if (exactIndex >= 0) return exactIndex;
+  }
+  for (const alias of aliases) {
+    const fuzzyIndex = headers.findIndex((header) => header.includes(alias) || alias.includes(header));
+    if (fuzzyIndex >= 0) return fuzzyIndex;
+  }
+  return -1;
+}
+
+function findTraceabilitySourceClabeColumn(headers) {
+  const aliases = [
+    "clabeorigen",
+    "cuentaorigen",
+    "cuentadeorigen",
+    "originclabe",
+    "sourceclabe",
+    "sourceaccount",
+    "originaccount",
+    "clabeordenante",
+    "cuentaordenante"
+  ];
+  let explicit = aliases
+    .map((alias) => headers.findIndex((header) => header === alias))
+    .find((index) => index >= 0);
+  if (explicit == null) {
+    explicit = aliases
+      .map((alias) => headers.findIndex((header) => header.includes(alias)))
+      .find((index) => index >= 0);
+  }
+  if (explicit >= 0) return explicit;
+
+  const candidates = headers
+    .map((header, index) => ({ header, index }))
+    .filter(({ header }) => /clabe|cuenta|account/.test(header));
+  return candidates.length === 1 ? candidates[0].index : -1;
+}
+
+function cellAt(row, index) {
+  return index >= 0 ? String(row[index] || "").trim() : "";
+}
+
+function normalizeTraceabilityHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeTraceabilityEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeTraceabilityClabe(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 17) return `0${digits}`;
+  return digits.length === 18 ? digits : "";
+}
+
+function normalizeTraceabilityName(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractTraceabilityClabe(value) {
+  const text = String(value || "");
+  const labeled = text.match(/(?:clabe|cuenta)\s*(?:retiro|destino|origen)?\D{0,40}(\d[\d\s-]{16,30}\d)/i);
+  const direct = normalizeTraceabilityClabe(labeled?.[1] || "");
+  if (direct) return direct;
+  return "";
+}
+
+function parseTraceabilityDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+  const localMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (localMatch) {
+    const [, day, month, year, hour = "0", minute = "0", second = "0"] = localMatch;
+    const fullYear = Number(year.length === 2 ? `20${year}` : year);
+    const date = new Date(fullYear, Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+    if (
+      date.getFullYear() === fullYear &&
+      date.getMonth() === Number(month) - 1 &&
+      date.getDate() === Number(day)
+    ) {
+      return date.getTime();
+    }
+    return 0;
+  }
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function excelXmlEscape(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function downloadTextFile(filename, contentType, content) {
+  const blob = new Blob([content], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function dateSlug() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function handleAiChatSubmit(event) {
@@ -1613,8 +2712,18 @@ async function loadChatMessagesForSuggestion(options = {}) {
       renderReplySuggestion();
       return;
     }
+    const liveChatData = await fetchJson("/api/support-ticket?action=livechat-get-chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chatId })
+    });
+    if (liveChatData.text) {
+      elements.replyInput.value = liveChatData.text;
+      renderReplySuggestion();
+      return;
+    }
     if (options.forceResult) {
-      renderReplyEmpty("Todavía no tengo mensajes del cliente para este chat. Revisa que el webhook de LiveChat esté apuntando a /api/livechat-webhook.");
+      renderReplyEmpty("Todavía no tengo mensajes útiles del cliente para este chat.");
     }
   } catch (error) {
     if (options.forceResult) {
@@ -1776,7 +2885,7 @@ function renderSlackPanelSearchResult(panelResult) {
           ${items.map(renderListPanelCard).join("")}
         </div>
       ` : `
-        <p class="search-state">${panelResult.error ? `No pude consultar esta lista: ${escapeHtml(panelResult.error)}` : "Sin coincidencias en esta lista."}</p>
+        <p class="search-state">${panelResult.error ? `No pude consultar esta lista: ${escapeHtml(panelResult.error)}` : panelResult.warning ? "Slack está limitado por ahora; no hay coincidencias disponibles de esta lista." : "Sin coincidencias en esta lista."}</p>
       `}
     </div>
   `;

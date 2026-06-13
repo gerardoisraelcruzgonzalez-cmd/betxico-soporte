@@ -6,7 +6,20 @@ import { writeAuditLog } from "../lib/audit.js";
 import { requireCurrentAccount } from "../lib/account-store.js";
 import { getSupportConfig, isSupportAdmin } from "../lib/remote-config.js";
 import { addAiExample, addAiFeedback, inferTopic, selectRelevantAiExamples } from "../lib/ai-training.js";
-import { getLiveChat, getLiveChatWelcomeRecord, listActiveLiveChats, saveLiveChatWelcomeRecord, sendLiveChatMessage } from "../lib/livechat.js";
+import {
+  claimLiveChatWelcome,
+  extractLiveChatCustomerMessages,
+  extractLiveChatTextMessages,
+  getLiveChat,
+  getLiveChatSafeTemplateRecord,
+  getLiveChatWelcomeRecord,
+  listActiveLiveChats,
+  releaseLiveChatWelcome,
+  saveLiveChatSafeTemplateRecord,
+  saveLiveChatWelcomeRecord,
+  sendLiveChatMessage
+} from "../lib/livechat.js";
+import { findSafeAutoTemplateReply, isSimpleGreeting } from "../lib/safe-template-replies.js";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
 const DEFAULT_OPENAI_FALLBACK_MODEL = "gpt-5.4-nano";
@@ -41,11 +54,17 @@ export default async function handler(req, res) {
     if (action === "livechat-send-message") {
       return await handleLiveChatSendMessage(req, res, payload);
     }
+    if (action === "livechat-auto-safe-template") {
+      return await handleLiveChatAutoSafeTemplate(req, res, payload);
+    }
     if (action === "livechat-list-active") {
       return await handleLiveChatListActive(req, res, payload);
     }
     if (action === "livechat-get-chat") {
       return await handleLiveChatGetChat(req, res, payload);
+    }
+    if (action === "livechat-customer-history") {
+      return await handleLiveChatCustomerHistory(req, res, payload);
     }
 
     const normalized = normalizeSupportPayload(payload);
@@ -356,9 +375,49 @@ async function handleLiveChatSendWelcome(req, res, payload) {
         sentAt: existing.sentAt
       });
     }
+
+    const chat = await getLiveChat(chatId).catch(() => null);
+    if (chat && liveChatAlreadyHasMessage(chat, message)) {
+      const sentAt = new Date().toISOString();
+      await saveLiveChatWelcomeRecord(chatId, {
+        sentAt,
+        eventId: "",
+        accountEmail: account.email || "",
+        message,
+        source: "history_detected"
+      }).catch(() => null);
+      return sendJson(res, 200, {
+        ok: true,
+        skipped: true,
+        reason: "welcome_already_in_chat",
+        chatId,
+        sentAt
+      });
+    }
   }
 
-  const result = await sendLiveChatMessage({ chatId, text: message });
+  // Claim atomico para evitar bienvenidas duplicadas por disparos concurrentes.
+  const oncePerChat = autoWelcome.oncePerChat !== false;
+  if (oncePerChat) {
+    const claimed = await claimLiveChatWelcome(chatId, { accountEmail: account.email || "", message });
+    if (!claimed) {
+      return sendJson(res, 200, {
+        ok: true,
+        skipped: true,
+        reason: "welcome_already_sent",
+        chatId
+      });
+    }
+  }
+
+  let result;
+  try {
+    result = await sendLiveChatMessage({ chatId, text: message });
+  } catch (error) {
+    // El envio fallo: liberamos el claim para permitir un reintento valido.
+    if (oncePerChat) await releaseLiveChatWelcome(chatId).catch(() => null);
+    throw error;
+  }
   const sentAt = new Date().toISOString();
   await saveLiveChatWelcomeRecord(chatId, {
     sentAt,
@@ -383,6 +442,15 @@ async function handleLiveChatSendWelcome(req, res, payload) {
   });
 }
 
+function liveChatAlreadyHasMessage(chat, message) {
+  const expected = normalizeComparableText(message);
+  if (!expected) return false;
+  return extractLiveChatTextMessages(chat).some((event) =>
+    normalizeComparableText(event.text) === expected &&
+    !["customer", "visitor"].includes(String(event.authorType || "").toLowerCase())
+  );
+}
+
 async function handleLiveChatSendMessage(req, res, payload) {
   const account = await requireCurrentAccount(req);
   const chatId = cleanText(payload.chatId || payload.chat_id);
@@ -405,6 +473,95 @@ async function handleLiveChatSendMessage(req, res, payload) {
   return sendJson(res, 200, { ok: true, chatId, eventId: result.event_id || "" });
 }
 
+async function handleLiveChatAutoSafeTemplate(req, res, payload) {
+  const account = await requireCurrentAccount(req);
+  const config = await getSupportConfig().catch(() => ({}));
+  const automation = config.liveChatAutomation || {};
+  const mode = String(automation.safeTemplateMode || "suggest_only").trim().toLowerCase();
+  const chatId = cleanText(payload.chatId || payload.chat_id);
+
+  if (!chatId) {
+    return sendJson(res, 400, { ok: false, error: "missing_chat_id" });
+  }
+  if (automation.enabled === false || mode !== "auto_send_safe") {
+    return sendJson(res, 200, { ok: true, skipped: true, reason: "safe_template_mode_not_auto", mode });
+  }
+
+  const existing = await getLiveChatSafeTemplateRecord(chatId).catch(() => null);
+  if (existing?.sentAt) {
+    return sendJson(res, 200, {
+      ok: true,
+      skipped: true,
+      reason: "safe_template_already_sent",
+      intent: existing.intent || existing.safe_template_intent || "",
+      sentAt: existing.sentAt
+    });
+  }
+
+  const chat = await getLiveChat(chatId);
+  const customerMessages = extractLiveChatCustomerMessages(chat);
+  const usefulMessages = customerMessages
+    .map((message) => ({ ...message, text: cleanText(message.text) }))
+    .filter((message) => message.text && !isSimpleGreeting(message.text));
+  const lastUseful = usefulMessages.at(-1);
+  if (!lastUseful) {
+    return sendJson(res, 200, { ok: true, skipped: true, reason: "no_useful_customer_message" });
+  }
+
+  const context = customerMessages.slice(-5).map((message) => message.text).filter(Boolean).join("\n");
+  const match = findSafeAutoTemplateReply(lastUseful.text, context, { requireAutoSendAllowed: true });
+  if (!match.matched) {
+    await writeAuditLog({
+      type: match.riskBlocked === true ? "livechat_widget_auto_safe_blocked_risk" : "livechat_widget_auto_safe_no_match",
+      status: "skipped",
+      chatId,
+      reason: match.reason || "no_match",
+      riskBlocked: match.riskBlocked === true,
+      account: { email: account.email || "" }
+    });
+    return sendJson(res, 200, {
+      ok: true,
+      skipped: true,
+      reason: match.reason || "no_match",
+      riskBlocked: match.riskBlocked === true
+    });
+  }
+
+  const result = await sendLiveChatMessage({ chatId, text: match.reply, visibility: "all" });
+  const sentAt = new Date().toISOString();
+  await saveLiveChatSafeTemplateRecord(chatId, {
+    sentAt,
+    intent: match.intent,
+    category: match.category,
+    eventId: result.event_id || "",
+    source: "widget_auto_safe_template"
+  }).catch(() => null);
+
+  await writeAuditLog({
+    type: "livechat_widget_auto_safe_sent",
+    status: "ok",
+    chatId,
+    eventId: result.event_id || "",
+    selectedIntent: match.intent,
+    category: match.category,
+    confidence: match.confidence || null,
+    riskLevel: "low",
+    source: "widget_auto_safe_template",
+    account: { email: account.email || "" }
+  });
+
+  return sendJson(res, 200, {
+    ok: true,
+    sent: true,
+    reason: "auto_safe_template_sent",
+    chatId,
+    eventId: result.event_id || "",
+    intent: match.intent,
+    category: match.category,
+    sentAt
+  });
+}
+
 async function handleLiveChatListActive(req, res, payload) {
   await requireCurrentAccount(req);
   const chats = await listActiveLiveChats({ limit: payload.limit || 25 });
@@ -415,7 +572,71 @@ async function handleLiveChatGetChat(req, res, payload) {
   await requireCurrentAccount(req);
   const chatId = cleanText(payload.chatId || payload.chat_id);
   const chat = await getLiveChat(chatId);
-  return sendJson(res, 200, { ok: true, chat });
+  const customerMessages = extractLiveChatCustomerMessages(chat);
+  return sendJson(res, 200, {
+    ok: true,
+    chat,
+    customerMessages,
+    text: customerMessages.map((message) => message.text).filter(Boolean).join("\n")
+  });
+}
+
+async function handleLiveChatCustomerHistory(req, res, payload) {
+  await requireCurrentAccount(req);
+  const email = cleanText(payload.email).toLowerCase();
+  const currentChatId = cleanText(payload.chatId || payload.chat_id);
+  if (!email) {
+    return sendJson(res, 200, { ok: true, history: [] });
+  }
+
+  const chats = await listActiveLiveChats({ limit: Math.min(100, Math.max(20, Number(payload.limit) || 60)) });
+  const matching = chats
+    .filter((chat) => chatIdFromLiveChat(chat) && chatIdFromLiveChat(chat) !== currentChatId)
+    .filter((chat) => liveChatHasCustomerEmail(chat, email))
+    .slice(0, 3);
+
+  const details = await Promise.all(matching.map(async (summary) => {
+    const chatId = chatIdFromLiveChat(summary);
+    const chat = await getLiveChat(chatId).catch(() => summary);
+    const messages = extractLiveChatTextMessages(chat)
+      .filter((message) => message.text)
+      .slice(-8);
+    return {
+      chatId,
+      dateLabel: formatHistoryDate(chat, summary),
+      summary: summarizeHistoryMessages(messages),
+      messages: messages.slice(-4)
+    };
+  }));
+
+  return sendJson(res, 200, { ok: true, history: details });
+}
+
+function chatIdFromLiveChat(chat = {}) {
+  return cleanText(chat.id || chat.chat_id || chat.chat?.id || chat.chat?.chat_id);
+}
+
+function liveChatHasCustomerEmail(chat = {}, email = "") {
+  const users = Array.isArray(chat.users) ? chat.users : Array.isArray(chat.chat?.users) ? chat.chat.users : [];
+  return users.some((user) =>
+    ["customer", "visitor"].includes(String(user?.type || "").toLowerCase()) &&
+    cleanText(user?.email).toLowerCase() === email
+  );
+}
+
+function formatHistoryDate(chat = {}, summary = {}) {
+  const raw = chat.created_at || summary.created_at || chat.last_thread_summary?.created_at || summary.last_thread_summary?.created_at || "";
+  if (!raw) return "Conversacion previa";
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? "Conversacion previa" : date.toLocaleString("es-MX", { timeZone: "America/Mexico_City" });
+}
+
+function summarizeHistoryMessages(messages = []) {
+  const useful = messages
+    .map((message) => `${["customer", "visitor"].includes(message.authorType) ? "Cliente" : "Agente"}: ${cleanText(message.text)}`)
+    .filter(Boolean)
+    .slice(-6);
+  return useful.join(" | ").slice(0, 900);
 }
 
 async function requireAdminAccount(req) {
@@ -1023,6 +1244,10 @@ function normalizeForSearch(value) {
 
 function cleanText(value) {
   return String(value || "").replace(/\u0000/g, "").trim();
+}
+
+function normalizeComparableText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function normalizeSupportPayload(payload) {
