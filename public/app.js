@@ -64,6 +64,7 @@ const elements = {
   sessionCloseBadge: document.getElementById("sessionCloseBadge"),
   sessionCloseTitle: document.getElementById("sessionCloseTitle"),
   sessionCloseSubtitle: document.getElementById("sessionCloseSubtitle"),
+  sessionCloseCountLabel: document.getElementById("sessionCloseCountLabel"),
   sessionCloseCount: document.getElementById("sessionCloseCount"),
   sessionCloseRange: document.getElementById("sessionCloseRange"),
   sessionClosePendingCount: document.getElementById("sessionClosePendingCount"),
@@ -72,6 +73,7 @@ const elements = {
   sessionCloseDate: document.getElementById("sessionCloseDate"),
   sessionCloseModalCloseBtn: document.getElementById("sessionCloseModalCloseBtn"),
   sessionCloseModalOkBtn: document.getElementById("sessionCloseModalOkBtn"),
+  sessionCloseConfirmBtn: document.getElementById("sessionCloseConfirmBtn"),
   kycEmailInput: document.getElementById("kycEmailInput"),
   openKycSearchBtn: document.getElementById("openKycSearchBtn"),
   kycCompleteBtn: document.getElementById("kycCompleteBtn"),
@@ -155,6 +157,7 @@ let currentReplyMatches = [];
 let activeListPanelId = "";
 let activeListPanelEmail = "";
 let lastAiAnswer = "";
+let currentSessionClosePreview = null;
 let lastAiQuestion = "";
 let lastAiTopic = "general";
 let pendingAgentAlerts = [];
@@ -385,6 +388,7 @@ function initialize() {
   elements.closeGameSessionsBtn?.addEventListener("click", handleCloseGameSessions);
   elements.sessionCloseModalCloseBtn?.addEventListener("click", closeGameSessionsModal);
   elements.sessionCloseModalOkBtn?.addEventListener("click", closeGameSessionsModal);
+  elements.sessionCloseConfirmBtn?.addEventListener("click", handleConfirmCloseGameSessions);
   elements.sessionCloseOverlay?.addEventListener("click", (event) => {
     if (event.target === elements.sessionCloseOverlay) closeGameSessionsModal();
   });
@@ -1195,15 +1199,12 @@ async function handleCloseGameSessions() {
     return;
   }
 
-  const confirmed = window.confirm(`Cerrar sesiones abiertas para el ID ${customerId}?`);
-  if (!confirmed) return;
-
   const previousHtml = elements.closeGameSessionsBtn?.innerHTML || "";
   if (elements.closeGameSessionsBtn) {
     elements.closeGameSessionsBtn.disabled = true;
-    elements.closeGameSessionsBtn.textContent = "Cerrando...";
+    elements.closeGameSessionsBtn.textContent = "Revisando...";
   }
-  renderCloseGameSessionsStatus(`Cerrando sesiones para ${customerId}... Si otro agente ya inició un cierre, esta solicitud quedará en cola.`, "loading");
+  renderCloseGameSessionsStatus(`Revisando sesiones para ${customerId}...`, "loading");
 
   try {
     const data = await fetchJson("/api/support-ticket?action=game-sessions-close", {
@@ -1211,6 +1212,7 @@ async function handleCloseGameSessions() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         customerId,
+        dryRun: true,
         chatId: elements.chatId.value.trim(),
         customerEmail: elements.customerEmail.value.trim(),
         customerName: elements.customerName.value.trim()
@@ -1220,15 +1222,63 @@ async function handleCloseGameSessions() {
     const summary = formatGameSessionsCloseSummary(data.result || {});
     renderCloseGameSessionsStatus(summary, "success");
     showResult(summary, "success");
-    showGameSessionsCloseDetail(data.result || {}, customerId);
+    currentSessionClosePreview = { customerId, result: data.result || {} };
+    showGameSessionsCloseDetail(data.result || {}, customerId, { allowConfirm: canConfirmGameSessionClose(data.result || {}) });
+  } catch (error) {
+    const message = formatError(error.message);
+    currentSessionClosePreview = null;
+    renderCloseGameSessionsStatus(message, "error");
+    showResult(`No pude revisar sesiones: ${message}`, "error");
+  } finally {
+    if (elements.closeGameSessionsBtn) {
+      elements.closeGameSessionsBtn.disabled = false;
+      elements.closeGameSessionsBtn.innerHTML = previousHtml;
+    }
+  }
+}
+
+async function handleConfirmCloseGameSessions() {
+  if (!ensureAuthenticated()) return;
+  const preview = currentSessionClosePreview;
+  const customerId = preview?.customerId || readSessionCloseCustomerId();
+  if (!isValidCustomerId(customerId) || !canConfirmGameSessionClose(preview?.result || {})) {
+    renderCloseGameSessionsStatus("Primero revisa sesiones y confirma que estén dentro del límite seguro.", "error");
+    return;
+  }
+
+  const previousHtml = elements.sessionCloseConfirmBtn?.innerHTML || "";
+  if (elements.sessionCloseConfirmBtn) {
+    elements.sessionCloseConfirmBtn.disabled = true;
+    elements.sessionCloseConfirmBtn.textContent = "Cerrando...";
+  }
+  renderCloseGameSessionsStatus(`Cierre confirmado para ${customerId}. Si otro agente ya inició uno, esta solicitud quedará en cola.`, "loading");
+
+  try {
+    const data = await fetchJson("/api/support-ticket?action=game-sessions-close", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customerId,
+        dryRun: false,
+        chatId: elements.chatId.value.trim(),
+        customerEmail: elements.customerEmail.value.trim(),
+        customerName: elements.customerName.value.trim()
+      })
+    });
+
+    const summary = formatGameSessionsCloseSummary(data.result || {});
+    currentSessionClosePreview = null;
+    renderCloseGameSessionsStatus(summary, "success");
+    showResult(summary, "success");
+    showGameSessionsCloseDetail(data.result || {}, customerId, { allowConfirm: false });
   } catch (error) {
     const message = formatError(error.message);
     renderCloseGameSessionsStatus(message, "error");
     showResult(`No pude cerrar sesiones: ${message}`, "error");
   } finally {
-    if (elements.closeGameSessionsBtn) {
-      elements.closeGameSessionsBtn.disabled = false;
-      elements.closeGameSessionsBtn.innerHTML = previousHtml;
+    if (elements.sessionCloseConfirmBtn) {
+      elements.sessionCloseConfirmBtn.disabled = false;
+      elements.sessionCloseConfirmBtn.innerHTML = previousHtml;
     }
   }
 }
@@ -1252,13 +1302,27 @@ function formatGameSessionsCloseSummary(result = {}) {
   if (estado === "requiere_revision") {
     return `${queuePrefix}Requiere revisión${cerradas !== null ? `: ${cerradas} cerradas` : ""}. ${result.notas || ""}`.trim();
   }
+  if (estado === "limite_excedido") {
+    return `${queuePrefix}Bloqueado por límite seguro. ${result.notas || ""}`.trim();
+  }
+  if (estado === "pendiente" && result.mode === "dry-run") {
+    const pendientes = Number(result.detalle?.pendientes ?? 0);
+    return pendientes > 0 ? `Revisión lista: cerraría ${pendientes} sesiones. Confirma para ejecutar.` : (result.notas || "Revisión lista.");
+  }
   if (estado === "error") {
     return `${queuePrefix}${result.notas || result.resultado || "El cierre terminó con error."}`;
   }
   return `${queuePrefix}${result.notas || result.resultado || `Resultado: ${estado}`}`;
 }
 
-function showGameSessionsCloseDetail(result = {}, customerId = "") {
+function canConfirmGameSessionClose(result = {}) {
+  const estado = String(result.estado || "").trim();
+  const pendientes = Number(result.detalle?.pendientes ?? 0);
+  const limite = Number(result.detalle?.limitePorCierre ?? 25);
+  return result.mode === "dry-run" && estado === "pendiente" && pendientes > 0 && pendientes <= limite;
+}
+
+function showGameSessionsCloseDetail(result = {}, customerId = "", options = {}) {
   if (!elements.sessionCloseOverlay) return;
   const estado = String(result.estado || "").trim();
   const detalle = result.detalle && typeof result.detalle === "object" ? result.detalle : {};
@@ -1266,6 +1330,8 @@ function showGameSessionsCloseDetail(result = {}, customerId = "") {
   const juegos = Array.isArray(detalle.juegos) ? detalle.juegos.filter(Boolean) : [];
   const pendingWins = Array.isArray(detalle.pendingWins) ? detalle.pendingWins.filter(Boolean) : [];
   const cerradas = Number.isFinite(Number(result.cantidadCerradas)) ? Number(result.cantidadCerradas) : 0;
+  const pendientes = Number.isFinite(Number(detalle.pendientes)) ? Number(detalle.pendientes) : 0;
+  const isPreview = result.mode === "dry-run";
   const title = estado === "completado"
     ? "Cierre completado"
     : estado === "sin_sesion"
@@ -1284,7 +1350,10 @@ function showGameSessionsCloseDetail(result = {}, customerId = "") {
     elements.sessionCloseSubtitle.textContent = result.mensajeCola || result.notas || "Resultado del cierre solicitado.";
   }
   if (elements.sessionCloseCount) {
-    elements.sessionCloseCount.textContent = String(cerradas);
+    elements.sessionCloseCount.textContent = String(isPreview ? pendientes : cerradas);
+  }
+  if (elements.sessionCloseCountLabel) {
+    elements.sessionCloseCountLabel.textContent = isPreview ? "Sesiones a cerrar" : "Sesiones cerradas";
   }
   if (elements.sessionCloseRange) {
     const inicio = rango.inicio || "";
@@ -1308,6 +1377,10 @@ function showGameSessionsCloseDetail(result = {}, customerId = "") {
   if (elements.sessionCloseDate) {
     elements.sessionCloseDate.textContent = result.fechaProceso || new Date().toLocaleString("es-MX");
   }
+  if (elements.sessionCloseConfirmBtn) {
+    elements.sessionCloseConfirmBtn.hidden = !options.allowConfirm;
+    elements.sessionCloseConfirmBtn.disabled = !options.allowConfirm;
+  }
 
   elements.sessionCloseOverlay.hidden = false;
   document.body.classList.add("session-close-modal-open");
@@ -1321,6 +1394,10 @@ function closeGameSessionsModal() {
   if (!elements.sessionCloseOverlay) return;
   elements.sessionCloseOverlay.hidden = true;
   document.body.classList.remove("session-close-modal-open");
+  if (elements.sessionCloseConfirmBtn) {
+    elements.sessionCloseConfirmBtn.hidden = true;
+    elements.sessionCloseConfirmBtn.disabled = true;
+  }
 }
 
 async function submitKycReviewStatus(status) {

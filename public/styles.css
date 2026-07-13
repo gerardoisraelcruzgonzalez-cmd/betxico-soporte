@@ -2322,6 +2322,21 @@ h1 {
   font-weight: 900;
 }
 
+.session-close-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.session-close-footer .session-close-confirm {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.95), rgba(21, 128, 61, 0.95));
+}
+
+.session-close-footer .session-close-confirm[hidden] {
+  display: none;
+}
+
 .kyc-action-panel {
   grid-column: 1 / -1;
   display: grid;
