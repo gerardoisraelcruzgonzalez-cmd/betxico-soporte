@@ -231,7 +231,7 @@ async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, accoun
       signal: controller.signal
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.ok === false) {
+    if (!response.ok) {
       const error = statusError(data.error || data.message || `betxico_assistant_http_${response.status}`, response.status || 502);
       error.details = data.details || undefined;
       error.upstreamStatus = response.status;
