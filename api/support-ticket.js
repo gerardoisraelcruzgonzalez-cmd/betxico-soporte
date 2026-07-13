@@ -200,7 +200,7 @@ async function handleGameSessionsClose(req, res, payload) {
 
 async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, account, chatId }) {
   const baseUrl = betxicoAssistantApiBaseUrl();
-  const accessToken = optionalEnv("BETXICO_ASSISTANT_ACCESS_TOKEN", optionalEnv("BETXICO_ASSISTANT_API_TOKEN", ""));
+  const accessToken = optionalEnv("BETXICO_ASSISTANT_ACCESS_TOKEN", optionalEnv("BETXICO_ASSISTANT_API_TOKEN", optionalEnv("SUPPORT_ALERTS_TOKEN", "")));
   const localToken = optionalEnv("BETXICO_ASSISTANT_LOCAL_TOKEN", "");
 
   if (!accessToken && !localToken) {
