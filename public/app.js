@@ -58,8 +58,10 @@ const elements = {
   refreshCustomerContextBtn: document.getElementById("refreshCustomerContextBtn"),
   traceabilityBtn: document.getElementById("traceabilityBtn"),
   sessionCloseCustomerId: document.getElementById("sessionCloseCustomerId"),
+  sessionCloseReason: document.getElementById("sessionCloseReason"),
   closeGameSessionsBtn: document.getElementById("closeGameSessionsBtn"),
   closeGameSessionsStatus: document.getElementById("closeGameSessionsStatus"),
+  sessionCloseRequestList: document.getElementById("sessionCloseRequestList"),
   sessionCloseOverlay: document.getElementById("sessionCloseOverlay"),
   sessionCloseBadge: document.getElementById("sessionCloseBadge"),
   sessionCloseTitle: document.getElementById("sessionCloseTitle"),
@@ -158,6 +160,8 @@ let activeListPanelId = "";
 let activeListPanelEmail = "";
 let lastAiAnswer = "";
 let currentSessionClosePreview = null;
+let sessionCloseRequests = [];
+let sessionCloseRequestPollId = null;
 let lastAiQuestion = "";
 let lastAiTopic = "general";
 let pendingAgentAlerts = [];
@@ -386,6 +390,7 @@ function initialize() {
   elements.quickDepositAmount?.addEventListener("input", renderQuickDepositPreview);
   elements.traceabilityBtn?.addEventListener("click", handleTraceabilityOpen);
   elements.closeGameSessionsBtn?.addEventListener("click", handleCloseGameSessions);
+  elements.sessionCloseRequestList?.addEventListener("click", handleSessionCloseRequestListClick);
   elements.sessionCloseModalCloseBtn?.addEventListener("click", closeGameSessionsModal);
   elements.sessionCloseModalOkBtn?.addEventListener("click", closeGameSessionsModal);
   elements.sessionCloseConfirmBtn?.addEventListener("click", handleConfirmCloseGameSessions);
@@ -514,6 +519,7 @@ async function loadAccount() {
     if (currentAccount) {
       showView("search");
       startSupportConfigPolling();
+      startSessionCloseRequestPolling();
     }
     loadSupportConfig();
     loadPublicSupportConfig();
@@ -536,6 +542,7 @@ function renderAccount() {
     activeAgentAlert = null;
     renderAgentAlert();
     stopSupportConfigPolling();
+    stopSessionCloseRequestPolling();
     showView("settings");
     return;
   }
@@ -640,6 +647,7 @@ async function handleLogin(event) {
     loadSupportConfig();
     loadPublicSupportConfig();
     startSupportConfigPolling();
+    startSessionCloseRequestPolling();
   } catch (error) {
     showResult(`No pude iniciar sesión: ${formatError(error.message)}`, "error");
   }
@@ -682,6 +690,7 @@ async function handleLogout() {
   activeAgentAlert = null;
   renderAgentAlert();
   stopSupportConfigPolling();
+  stopSessionCloseRequestPolling();
   renderAccount();
   elements.adminConfigForm.hidden = true;
   showView("settings");
@@ -795,6 +804,84 @@ function stopSupportConfigPolling() {
   if (!supportConfigPollId) return;
   window.clearInterval(supportConfigPollId);
   supportConfigPollId = null;
+}
+
+function startSessionCloseRequestPolling() {
+  if (sessionCloseRequestPollId || !currentAccount) return;
+  loadSessionCloseRequests().catch(() => null);
+  sessionCloseRequestPollId = window.setInterval(() => {
+    if (currentAccount && !document.hidden) {
+      loadSessionCloseRequests().catch(() => null);
+    }
+  }, 15000);
+}
+
+function stopSessionCloseRequestPolling() {
+  if (sessionCloseRequestPollId) {
+    window.clearInterval(sessionCloseRequestPollId);
+    sessionCloseRequestPollId = null;
+  }
+  sessionCloseRequests = [];
+  renderSessionCloseRequests();
+}
+
+async function loadSessionCloseRequests() {
+  if (!currentAccount) return;
+  const data = await fetchJson("/api/support-ticket?action=game-sessions-requests", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status: "all", limit: 12 })
+  });
+  sessionCloseRequests = Array.isArray(data.requests) ? data.requests : [];
+  renderSessionCloseRequests();
+}
+
+function renderSessionCloseRequests() {
+  if (!elements.sessionCloseRequestList) return;
+  const activeOrRecent = sessionCloseRequests
+    .filter((request) => request && request.customerId)
+    .slice(0, 6);
+
+  elements.sessionCloseRequestList.hidden = activeOrRecent.length === 0;
+  if (!activeOrRecent.length) {
+    elements.sessionCloseRequestList.innerHTML = "";
+    return;
+  }
+
+  elements.sessionCloseRequestList.innerHTML = activeOrRecent.map((request) => {
+    const status = String(request.status || "pending");
+    const result = request.result && typeof request.result === "object" ? request.result : null;
+    const closed = Number(result?.cantidadCerradas ?? 0);
+    const games = Array.isArray(result?.detalle?.juegos) ? result.detalle.juegos.length : 0;
+    const subtitle = status === "completed"
+      ? `Completado · ${closed} sesiones · ${games} juegos`
+      : status === "processing"
+        ? "APP Betxico está cerrando sesiones"
+        : status === "pending"
+          ? "Pendiente de autorización en APP Betxico"
+          : status === "rejected"
+            ? "Rechazado desde APP Betxico"
+            : (request.lastError || "Error en el proceso");
+    return `
+      <div class="session-close-request-item" data-status="${escapeHtml(status)}">
+        <div>
+          <strong>ID ${escapeHtml(request.customerId)}</strong>
+          <span>${escapeHtml(subtitle)}</span>
+        </div>
+        ${status === "completed" && result ? `<button type="button" data-session-close-result="${escapeHtml(request.id)}">Ver</button>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+function handleSessionCloseRequestListClick(event) {
+  const button = event.target.closest("[data-session-close-result]");
+  if (!button) return;
+  const id = button.getAttribute("data-session-close-result");
+  const request = sessionCloseRequests.find((item) => item.id === id);
+  if (request?.result) {
+    showGameSessionsCloseDetail(request.result, request.customerId, { allowConfirm: false });
+  }
 }
 
 function renderAgentAlert() {
@@ -1202,33 +1289,35 @@ async function handleCloseGameSessions() {
   const previousHtml = elements.closeGameSessionsBtn?.innerHTML || "";
   if (elements.closeGameSessionsBtn) {
     elements.closeGameSessionsBtn.disabled = true;
-    elements.closeGameSessionsBtn.textContent = "Revisando...";
+    elements.closeGameSessionsBtn.textContent = "Enviando...";
   }
-  renderCloseGameSessionsStatus(`Revisando sesiones para ${customerId}...`, "loading");
+  renderCloseGameSessionsStatus(`Enviando solicitud para ${customerId} a APP Betxico...`, "loading");
 
   try {
-    const data = await fetchJson("/api/support-ticket?action=game-sessions-close", {
+    const data = await fetchJson("/api/support-ticket?action=game-sessions-request", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         customerId,
-        dryRun: true,
+        reason: elements.sessionCloseReason?.value.trim() || "",
         chatId: elements.chatId.value.trim(),
         customerEmail: elements.customerEmail.value.trim(),
         customerName: elements.customerName.value.trim()
       })
     });
 
-    const summary = formatGameSessionsCloseSummary(data.result || {});
-    renderCloseGameSessionsStatus(summary, "success");
-    showResult(summary, "success");
-    currentSessionClosePreview = { customerId, result: data.result || {} };
-    showGameSessionsCloseDetail(data.result || {}, customerId, { allowConfirm: canConfirmGameSessionClose(data.result || {}) });
+    const status = data.duplicate
+      ? `Ya existe una solicitud activa para ${customerId}.`
+      : `Solicitud enviada para ${customerId}. APP Betxico la autoriza y cierra.`;
+    renderCloseGameSessionsStatus(status, "success");
+    showResult(status, "success");
+    elements.sessionCloseReason && (elements.sessionCloseReason.value = "");
+    await loadSessionCloseRequests();
   } catch (error) {
     const message = formatError(error.message);
     currentSessionClosePreview = null;
     renderCloseGameSessionsStatus(message, "error");
-    showResult(`No pude revisar sesiones: ${message}`, "error");
+    showResult(`No pude enviar la solicitud: ${message}`, "error");
   } finally {
     if (elements.closeGameSessionsBtn) {
       elements.closeGameSessionsBtn.disabled = false;
@@ -3819,7 +3908,11 @@ function formatError(message) {
     sensitive_action_requires_local_token: "APP Betxico rechazó el cierre: el token no tiene permiso admin.",
     "Game session closure is disabled by ACTION_CLOSE_GAME_SESSIONS": "el cierre de sesiones está desactivado en APP Betxico.",
     betxico_assistant_timeout: "APP Betxico tardó demasiado en responder.",
-    game_sessions_close_failed: "APP Betxico no pudo cerrar sesiones."
+    game_sessions_close_failed: "APP Betxico no pudo cerrar sesiones.",
+    game_sessions_request_failed: "no pude enviar la solicitud a APP Betxico.",
+    game_sessions_requests_failed: "no pude leer las solicitudes de cierre.",
+    session_close_request_already_processing: "esa solicitud ya está en proceso en APP Betxico.",
+    session_close_request_already_finished: "esa solicitud ya fue atendida en APP Betxico."
   };
   return dictionary[raw] || raw;
 }

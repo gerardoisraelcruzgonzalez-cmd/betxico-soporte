@@ -66,8 +66,11 @@ export default async function handler(req, res) {
     if (action === "livechat-customer-history") {
       return await handleLiveChatCustomerHistory(req, res, payload);
     }
-    if (action === "game-sessions-close") {
-      return await handleGameSessionsClose(req, res, payload);
+    if (action === "game-sessions-close" || action === "game-sessions-request") {
+      return await handleGameSessionsRequest(req, res, payload);
+    }
+    if (action === "game-sessions-requests") {
+      return await handleGameSessionsRequestsList(req, res, payload);
     }
 
     const normalized = normalizeSupportPayload(payload);
@@ -143,18 +146,16 @@ function buildSlackAccountIdentity(account = {}) {
   };
 }
 
-async function handleGameSessionsClose(req, res, payload) {
+async function handleGameSessionsRequest(req, res, payload) {
   const account = await requireCurrentAccount(req);
   const customerId = cleanCustomerId(payload.customerId || payload.authId || payload.customer_id);
   if (!customerId) {
     return sendJson(res, 400, { ok: false, error: "invalid_customer_id" });
   }
 
-  const dryRun = Boolean(payload.dryRun);
   const auditBase = {
-    type: "game_sessions_close_remote",
+    type: "game_sessions_close_request",
     customerId,
-    dryRun,
     source: "support-livechat-app",
     chatId: cleanText(payload.chatId).slice(0, 120),
     account: {
@@ -164,9 +165,11 @@ async function handleGameSessionsClose(req, res, payload) {
   };
 
   try {
-    const result = await closeGameSessionsViaBetxicoAssistant({
+    const data = await requestGameSessionsClosureViaBetxicoAssistant({
       customerId,
-      dryRun,
+      reason: cleanText(payload.reason || payload.note || payload.message).slice(0, 260),
+      customerName: cleanText(payload.customerName).slice(0, 160),
+      customerEmail: cleanText(payload.customerEmail).slice(0, 180),
       account,
       chatId: auditBase.chatId
     });
@@ -174,31 +177,53 @@ async function handleGameSessionsClose(req, res, payload) {
     await writeAuditLog({
       ...auditBase,
       status: "ok",
-      result: summarizeGameSessionCloseResult(result)
+      requestId: data.request?.id || "",
+      duplicate: Boolean(data.duplicate)
     });
 
     return sendJson(res, 200, {
       ok: true,
       customerId,
-      result
+      duplicate: Boolean(data.duplicate),
+      request: data.request
     });
   } catch (error) {
     await writeAuditLog({
       ...auditBase,
       status: "error",
-      error: error.message || "game_sessions_close_failed",
+      error: error.message || "game_sessions_request_failed",
       upstreamStatus: error.upstreamStatus || undefined
     });
 
     return sendJson(res, error.statusCode || 500, {
       ok: false,
-      error: error.message || "game_sessions_close_failed",
+      error: error.message || "game_sessions_request_failed",
       details: error.details || undefined
     });
   }
 }
 
-async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, account, chatId }) {
+async function handleGameSessionsRequestsList(req, res, payload) {
+  await requireCurrentAccount(req);
+  try {
+    const data = await listGameSessionsClosureRequestsViaBetxicoAssistant({
+      status: cleanText(payload.status || "all") || "all",
+      limit: Number(payload.limit || 20)
+    });
+    return sendJson(res, 200, {
+      ok: true,
+      requests: Array.isArray(data.requests) ? data.requests : []
+    });
+  } catch (error) {
+    return sendJson(res, error.statusCode || 500, {
+      ok: false,
+      error: error.message || "game_sessions_requests_failed",
+      details: error.details || undefined
+    });
+  }
+}
+
+async function requestGameSessionsClosureViaBetxicoAssistant({ customerId, reason, customerName, customerEmail, account, chatId }) {
   const baseUrl = betxicoAssistantApiBaseUrl();
   const accessToken = optionalEnv("BETXICO_ASSISTANT_ACCESS_TOKEN", optionalEnv("BETXICO_ASSISTANT_API_TOKEN", optionalEnv("SUPPORT_ALERTS_TOKEN", "")));
   const localToken = optionalEnv("BETXICO_ASSISTANT_LOCAL_TOKEN", "");
@@ -209,7 +234,7 @@ async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, accoun
 
   const headers = {
     "content-type": "application/json",
-    "idempotency-key": buildGameSessionIdempotencyKey(customerId, chatId)
+    "idempotency-key": buildGameSessionRequestIdempotencyKey(customerId, chatId)
   };
 
   if (accessToken) {
@@ -222,12 +247,21 @@ async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, accoun
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 150000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch(`${baseUrl}/game-sessions/close`, {
+    const response = await fetch(`${baseUrl}/game-session-requests`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ customerId, dryRun }),
+      body: JSON.stringify({
+        customerId,
+        reason,
+        chatId,
+        customerName,
+        customerEmail,
+        requestedByName: account.displayName || "",
+        requestedByEmail: account.email || "",
+        source: "support-livechat-app"
+      }),
       signal: controller.signal
     });
     const data = await response.json().catch(() => ({}));
@@ -248,6 +282,40 @@ async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, accoun
   }
 }
 
+async function listGameSessionsClosureRequestsViaBetxicoAssistant({ status, limit }) {
+  const baseUrl = betxicoAssistantApiBaseUrl();
+  const accessToken = optionalEnv("BETXICO_ASSISTANT_ACCESS_TOKEN", optionalEnv("BETXICO_ASSISTANT_API_TOKEN", optionalEnv("SUPPORT_ALERTS_TOKEN", "")));
+  const localToken = optionalEnv("BETXICO_ASSISTANT_LOCAL_TOKEN", "");
+
+  if (!accessToken && !localToken) {
+    throw statusError("missing_betxico_assistant_token", 500);
+  }
+
+  const headers = { "accept": "application/json" };
+  if (accessToken) {
+    headers.authorization = `Bearer ${accessToken}`;
+  }
+  if (localToken) {
+    headers["x-betxico-local-token"] = localToken;
+    headers["x-betxico-role"] = "admin";
+    headers["x-betxico-actor"] = "support-livechat-app";
+  }
+
+  const params = new URLSearchParams({
+    status: ["active", "all", "pending", "processing", "completed", "rejected", "error"].includes(status) ? status : "all",
+    limit: String(Math.max(1, Math.min(Number.isFinite(limit) ? limit : 20, 50)))
+  });
+  const response = await fetch(`${baseUrl}/game-session-requests?${params.toString()}`, { headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = statusError(data.error || data.message || `betxico_assistant_http_${response.status}`, response.status || 502);
+    error.details = data.details || undefined;
+    error.upstreamStatus = response.status;
+    throw error;
+  }
+  return data;
+}
+
 function betxicoAssistantApiBaseUrl() {
   const raw = optionalEnv("BETXICO_ASSISTANT_API_URL", "").replace(/\/+$/, "");
   if (!raw) {
@@ -261,9 +329,9 @@ function cleanCustomerId(value) {
   return /^\d{3,20}$/.test(customerId) ? customerId : "";
 }
 
-function buildGameSessionIdempotencyKey(customerId, chatId) {
+function buildGameSessionRequestIdempotencyKey(customerId, chatId) {
   const safeChat = cleanText(chatId).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80) || "manual";
-  return `support-livechat:game-sessions-close:${customerId}:${safeChat}:${Date.now()}`;
+  return `support-livechat:game-sessions-request:${customerId}:${safeChat}`;
 }
 
 function summarizeGameSessionCloseResult(result = {}) {

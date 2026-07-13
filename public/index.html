@@ -101,14 +101,19 @@
             </button>
             <div class="session-close-panel">
               <label>
-                <span class="field-label">ID cierre sesiones</span>
+                <span class="field-label">ID cliente</span>
                 <input id="sessionCloseCustomerId" type="text" inputmode="numeric" autocomplete="off" placeholder="376295">
+              </label>
+              <label>
+                <span class="field-label">Motivo corto</span>
+                <input id="sessionCloseReason" type="text" autocomplete="off" maxlength="260" placeholder="cliente no puede entrar a juego">
               </label>
               <button id="closeGameSessionsBtn" type="button" class="quick-action-button session-close-button">
                 <span class="quick-action-icon" aria-hidden="true">⏻</span>
-                Revisar sesiones
+                Solicitar cierre
               </button>
-              <span id="closeGameSessionsStatus" class="session-close-status">Primero revisa sesiones; después confirma el cierre.</span>
+              <span id="closeGameSessionsStatus" class="session-close-status">El agente solo solicita; APP Betxico autoriza y cierra.</span>
+              <div id="sessionCloseRequestList" class="session-close-request-list" hidden></div>
             </div>
             <div class="kyc-action-panel">
               <label>
@@ -562,6 +567,6 @@
 
     <script src="https://unpkg.com/@livechat/agent-app-sdk@1.15.0/dist/agentapp.umd.min.js"></script>
     <script src="/vendor/exceljs.min.js"></script>
-    <script type="module" src="/app.js?v=20260713-session-close-safe-v2"></script>
+    <script type="module" src="/app.js?v=20260713-session-close-request-v1"></script>
   </body>
 </html>
