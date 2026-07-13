@@ -66,10 +66,16 @@ export default async function handler(req, res) {
     if (action === "livechat-customer-history") {
       return await handleLiveChatCustomerHistory(req, res, payload);
     }
+    if (action === "game-sessions-close") {
+      return await handleGameSessionsClose(req, res, payload);
+    }
 
     const normalized = normalizeSupportPayload(payload);
     const account = await requireCurrentAccount(req);
     const slackAccountIdentity = buildSlackAccountIdentity(account);
+    if (normalized.source === "raycast") {
+      normalized.slackFields.agentName = account.displayName || account.email || normalized.slackFields.agentName;
+    }
     if (account?.configured) {
       normalized.accountSettings = account;
     }
@@ -135,6 +141,145 @@ function buildSlackAccountIdentity(account = {}) {
     defaultAssigneeAccountId: account.defaultAssigneeAccountId || "",
     defaultLabels: account.defaultLabels || ""
   };
+}
+
+async function handleGameSessionsClose(req, res, payload) {
+  const account = await requireCurrentAccount(req);
+  const customerId = cleanCustomerId(payload.customerId || payload.authId || payload.customer_id);
+  if (!customerId) {
+    return sendJson(res, 400, { ok: false, error: "invalid_customer_id" });
+  }
+
+  const dryRun = Boolean(payload.dryRun);
+  const auditBase = {
+    type: "game_sessions_close_remote",
+    customerId,
+    dryRun,
+    source: "support-livechat-app",
+    chatId: cleanText(payload.chatId).slice(0, 120),
+    account: {
+      email: account.email || "",
+      displayName: account.displayName || ""
+    }
+  };
+
+  try {
+    const result = await closeGameSessionsViaBetxicoAssistant({
+      customerId,
+      dryRun,
+      account,
+      chatId: auditBase.chatId
+    });
+
+    await writeAuditLog({
+      ...auditBase,
+      status: "ok",
+      result: summarizeGameSessionCloseResult(result)
+    });
+
+    return sendJson(res, 200, {
+      ok: true,
+      customerId,
+      result
+    });
+  } catch (error) {
+    await writeAuditLog({
+      ...auditBase,
+      status: "error",
+      error: error.message || "game_sessions_close_failed",
+      upstreamStatus: error.upstreamStatus || undefined
+    });
+
+    return sendJson(res, error.statusCode || 500, {
+      ok: false,
+      error: error.message || "game_sessions_close_failed",
+      details: error.details || undefined
+    });
+  }
+}
+
+async function closeGameSessionsViaBetxicoAssistant({ customerId, dryRun, account, chatId }) {
+  const baseUrl = betxicoAssistantApiBaseUrl();
+  const accessToken = optionalEnv("BETXICO_ASSISTANT_ACCESS_TOKEN", optionalEnv("BETXICO_ASSISTANT_API_TOKEN", ""));
+  const localToken = optionalEnv("BETXICO_ASSISTANT_LOCAL_TOKEN", "");
+
+  if (!accessToken && !localToken) {
+    throw statusError("missing_betxico_assistant_token", 500);
+  }
+
+  const headers = {
+    "content-type": "application/json",
+    "idempotency-key": buildGameSessionIdempotencyKey(customerId, chatId)
+  };
+
+  if (accessToken) {
+    headers.authorization = `Bearer ${accessToken}`;
+  }
+  if (localToken) {
+    headers["x-betxico-local-token"] = localToken;
+    headers["x-betxico-role"] = "admin";
+    headers["x-betxico-actor"] = account.email || "support-livechat-app";
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 150000);
+  try {
+    const response = await fetch(`${baseUrl}/game-sessions/close`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ customerId, dryRun }),
+      signal: controller.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) {
+      const error = statusError(data.error || data.message || `betxico_assistant_http_${response.status}`, response.status || 502);
+      error.details = data.details || undefined;
+      error.upstreamStatus = response.status;
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw statusError("betxico_assistant_timeout", 504);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function betxicoAssistantApiBaseUrl() {
+  const raw = optionalEnv("BETXICO_ASSISTANT_API_URL", "").replace(/\/+$/, "");
+  if (!raw) {
+    throw statusError("missing_betxico_assistant_api_url", 500);
+  }
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
+function cleanCustomerId(value) {
+  const customerId = String(value || "").trim();
+  return /^\d{3,20}$/.test(customerId) ? customerId : "";
+}
+
+function buildGameSessionIdempotencyKey(customerId, chatId) {
+  const safeChat = cleanText(chatId).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80) || "manual";
+  return `support-livechat:game-sessions-close:${customerId}:${safeChat}:${Date.now()}`;
+}
+
+function summarizeGameSessionCloseResult(result = {}) {
+  return {
+    estado: result.estado || "",
+    resultado: result.resultado || "",
+    cantidadCerradas: result.cantidadCerradas ?? null,
+    fechaProceso: result.fechaProceso || "",
+    notas: result.notas || ""
+  };
+}
+
+function statusError(message, statusCode) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
 }
 
 async function handleAiChat(req, res, payload) {

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Soporte Betxico</title>
-    <link rel="stylesheet" href="/styles.css?v=20260605a">
+    <link rel="stylesheet" href="/styles.css?v=20260711-kyc-review-v2">
   </head>
   <body data-auth="loading">
     <main class="app-shell">
@@ -69,6 +69,13 @@
               <p id="customerContextStatus">Consultando historial operativo...</p>
             </div>
           </div>
+          <form id="supportAlertForm" class="support-alert-form">
+            <label>
+              <span class="field-label">Dato corto para la alerta</span>
+              <input id="supportAlertMessage" type="text" maxlength="180" autocomplete="off" placeholder="Ej. revisar retiro urgente, falta evidencia, cliente molesto...">
+            </label>
+            <button id="sendSupportAlertBtn" type="submit">Enviar Alerta</button>
+          </form>
           <div id="customerContextContent" class="customer-context-content"></div>
           <button id="refreshCustomerContextBtn" type="button" class="secondary-button">ACTUALIZAR CONTEXTO</button>
         </section>
@@ -92,6 +99,35 @@
               <span class="quick-action-icon" aria-hidden="true">↔</span>
               Trazabilidad retiro/deposito
             </button>
+            <div class="session-close-panel">
+              <label>
+                <span class="field-label">ID cierre sesiones</span>
+                <input id="sessionCloseCustomerId" type="text" inputmode="numeric" autocomplete="off" placeholder="376295">
+              </label>
+              <button id="closeGameSessionsBtn" type="button" class="quick-action-button session-close-button">
+                <span class="quick-action-icon" aria-hidden="true">⏻</span>
+                Cerrar sesiones
+              </button>
+              <span id="closeGameSessionsStatus" class="session-close-status">Usa el AUTH ID del chat o captura uno manual.</span>
+            </div>
+            <div class="kyc-action-panel">
+              <label>
+                <span class="field-label">Correo KYC</span>
+                <input id="kycEmailInput" type="email" autocomplete="off" placeholder="cliente@correo.com">
+              </label>
+              <button id="openKycSearchBtn" type="button" class="quick-action-button quick-action-button-alt">
+                <span class="quick-action-icon" aria-hidden="true">ID</span>
+                Abrir KYC
+              </button>
+              <button id="kycCompleteBtn" type="button" class="quick-action-button kyc-complete-button">
+                <span class="quick-action-icon" aria-hidden="true">✓</span>
+                KYC completo
+              </button>
+              <button id="kycIncompleteBtn" type="button" class="quick-action-button kyc-incomplete-button">
+                <span class="quick-action-icon" aria-hidden="true">!</span>
+                KYC incompleto
+              </button>
+            </div>
           </div>
           <form id="quickDepositForm" class="quick-deposit-form" hidden>
             <div class="quick-deposit-preview" id="quickDepositPreview"></div>
@@ -480,6 +516,6 @@
 
     <script src="https://unpkg.com/@livechat/agent-app-sdk@1.15.0/dist/agentapp.umd.min.js"></script>
     <script src="/vendor/exceljs.min.js"></script>
-    <script type="module" src="/app.js?v=20260606b"></script>
+    <script type="module" src="/app.js?v=20260711-kyc-review-v2"></script>
   </body>
 </html>

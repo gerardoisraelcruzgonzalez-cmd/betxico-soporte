@@ -10,6 +10,7 @@ La ruta recomendada es instalar esta app como widget interno de LiveChat Agent A
 - `public/app.js`: lectura basica del perfil del cliente, carga de metadata de Jira y envio al backend.
 - `api/support-ticket.js`: endpoint para crear ticket de Jira, reportar en Slack y registrar auditoria.
 - `api/support-ticket.js?action=ai-chat`: endpoint interno para consultar GPT desde la app sin exponer la llave en el navegador.
+- `api/support-ticket.js?action=game-sessions-close`: accion interna para cerrar sesiones BoB desde LiveChat reutilizando el backend de APP Betxico.
 - `api/jira-metadata.js`: endpoint para leer tipos de incidencia y campos configurados en Jira.
 - `api/livechat-webhook.js`: endpoint base para recibir eventos de LiveChat.
 - `lib/jira.js`: cliente minimo para Jira Cloud.
@@ -211,6 +212,45 @@ KV_REST_API_TOKEN
 SUPPORT_SESSION_SECRET
 SUPPORT_ENCRYPTION_KEY
 ```
+
+## Cierre remoto de sesiones BoB desde LiveChat
+
+La accion rapida `Cerrar sesiones` no controla BoB directamente. La app de soporte manda el `AUTH ID` al backend existente de APP Betxico y ese backend ejecuta el flujo ya configurado de cierre de sesiones.
+
+Variables necesarias:
+
+```text
+BETXICO_ASSISTANT_API_URL=https://tu-backend-betxico/api
+BETXICO_ASSISTANT_ACCESS_TOKEN=SERVICE_API_TOKEN_de_APP_Betxico
+```
+
+Para pruebas locales con el backend de APP Betxico en `NODE_ENV=development`, tambien puedes usar:
+
+```text
+BETXICO_ASSISTANT_API_URL=http://127.0.0.1:8787/api
+BETXICO_ASSISTANT_LOCAL_TOKEN=valor_de_LOCAL_BACKEND_TOKEN
+```
+
+Requisitos del backend APP Betxico:
+
+- `ACTION_CLOSE_GAME_SESSIONS=true`.
+- El token recomendado es `SERVICE_API_TOKEN` de APP Betxico; entra como integracion interna admin.
+- `GAME_SESSION_RUNNER_DIR` y el runner de cierre deben seguir configurados en APP Betxico.
+- El endpoint usado es `POST /api/game-sessions/close`; no se crea un segundo runner en esta app.
+
+### Clientes de dispositivo (Raycast)
+
+Raycast y otros clientes internos usan tokens personales revocables, no
+`INTERNAL_API_KEY`. El cliente inicia sesion una vez con correo y PIN mediante
+`POST /api/account-settings?action=device-auth`; el backend devuelve un token `btq_...` valido por 90
+dias y guarda solamente su hash en KV.
+
+- `POST /api/account-settings?action=device-auth`: crear token personal.
+- `GET /api/account-settings?action=device-auth`: validar token actual.
+- `DELETE /api/account-settings?action=device-auth`: revocar token actual.
+
+Las peticiones posteriores envian `Authorization: Bearer btq_...`. Cada
+peticion vuelve a validar que el usuario siga autorizado.
 
 ## Asistente GPT interno
 

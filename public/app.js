@@ -52,8 +52,18 @@ const elements = {
   customerContextPanel: document.getElementById("customerContextPanel"),
   customerContextStatus: document.getElementById("customerContextStatus"),
   customerContextContent: document.getElementById("customerContextContent"),
+  supportAlertForm: document.getElementById("supportAlertForm"),
+  supportAlertMessage: document.getElementById("supportAlertMessage"),
+  sendSupportAlertBtn: document.getElementById("sendSupportAlertBtn"),
   refreshCustomerContextBtn: document.getElementById("refreshCustomerContextBtn"),
   traceabilityBtn: document.getElementById("traceabilityBtn"),
+  sessionCloseCustomerId: document.getElementById("sessionCloseCustomerId"),
+  closeGameSessionsBtn: document.getElementById("closeGameSessionsBtn"),
+  closeGameSessionsStatus: document.getElementById("closeGameSessionsStatus"),
+  kycEmailInput: document.getElementById("kycEmailInput"),
+  openKycSearchBtn: document.getElementById("openKycSearchBtn"),
+  kycCompleteBtn: document.getElementById("kycCompleteBtn"),
+  kycIncompleteBtn: document.getElementById("kycIncompleteBtn"),
   traceabilityPanel: document.getElementById("traceabilityPanel"),
   traceabilityCloseBtn: document.getElementById("traceabilityCloseBtn"),
   traceabilityDepositFile: document.getElementById("traceabilityDepositFile"),
@@ -360,6 +370,10 @@ function initialize() {
   elements.quickDepositTrackingKey?.addEventListener("input", renderQuickDepositPreview);
   elements.quickDepositAmount?.addEventListener("input", renderQuickDepositPreview);
   elements.traceabilityBtn?.addEventListener("click", handleTraceabilityOpen);
+  elements.closeGameSessionsBtn?.addEventListener("click", handleCloseGameSessions);
+  elements.openKycSearchBtn?.addEventListener("click", openKycBackofficeSearch);
+  elements.kycCompleteBtn?.addEventListener("click", () => submitKycReviewStatus("complete"));
+  elements.kycIncompleteBtn?.addEventListener("click", () => submitKycReviewStatus("incomplete"));
   elements.traceabilityCloseBtn?.addEventListener("click", handleTraceabilityClose);
   elements.traceabilityRunBtn?.addEventListener("click", handleTraceabilityRun);
   elements.traceabilityDownloadCsvBtn?.addEventListener("click", handleTraceabilityDownloadCsv);
@@ -377,6 +391,7 @@ function initialize() {
   elements.aiBadBtn?.addEventListener("click", handleAiBad);
   elements.sendWelcomeBtn?.addEventListener("click", () => sendLiveChatWelcome({ manual: true }));
   elements.refreshCustomerContextBtn?.addEventListener("click", () => loadCustomerContext({ force: true }));
+  elements.supportAlertForm?.addEventListener("submit", handleSendSupportAlert);
   elements.quickDepositEvidence?.addEventListener("click", () => {
     elements.quickDepositEvidence.focus();
     elements.attachmentInput.click();
@@ -1091,6 +1106,184 @@ function ensureAuthenticated() {
   return false;
 }
 
+function openKycBackofficeSearch() {
+  if (!ensureAuthenticated()) return;
+  syncKycEmailInput();
+  const email = readKycEmail();
+  if (!looksLikeEmail(email)) {
+    showResult("Escribe un correo válido para abrir KYC.", "error");
+    return;
+  }
+
+  const usersPopup = window.open(buildKycBackofficeUrl("users", email), "_blank", "noopener,noreferrer");
+  const verificationsPopup = window.open(buildKycBackofficeUrl("verifications", email), "_blank", "noopener,noreferrer");
+  copyTextToClipboard(email).catch(() => null);
+  if (!usersPopup && !verificationsPopup) {
+    showResult(`No pude abrir KYC automáticamente. Copié el correo: ${email}`, "error");
+    return;
+  }
+
+  showResult(`Abrí Usuarios y Verificaciones KYC. Copié el correo ${email}.`, "success");
+}
+
+function buildKycBackofficeUrl(section, email) {
+  const base = "https://backoffice-kyc.paybridge.com.mx";
+  const path = section === "verifications" ? "/dashboard/verifications" : "/dashboard/users";
+  const params = new URLSearchParams({
+    search: email,
+    page: "1",
+    limit: "20",
+    sort_by: "created_at",
+    sort_order: "desc"
+  });
+  return `${base}${path}?${params.toString()}`;
+}
+
+function syncKycEmailInput(options = {}) {
+  if (!elements.kycEmailInput) return;
+  const detectedEmail = elements.customerEmail.value.trim().toLowerCase();
+  if (options.force || (!elements.kycEmailInput.value.trim() && looksLikeEmail(detectedEmail))) {
+    elements.kycEmailInput.value = detectedEmail;
+  }
+}
+
+function readKycEmail() {
+  return String(elements.kycEmailInput?.value || elements.customerEmail.value || "").trim().toLowerCase();
+}
+
+function syncSessionCloseCustomerId(options = {}) {
+  if (!elements.sessionCloseCustomerId) return;
+  const detectedId = elements.authId.value.trim();
+  if (options.force || (!elements.sessionCloseCustomerId.value.trim() && isValidCustomerId(detectedId))) {
+    elements.sessionCloseCustomerId.value = detectedId;
+  }
+}
+
+function readSessionCloseCustomerId() {
+  return String(elements.sessionCloseCustomerId?.value || elements.authId.value || "").trim();
+}
+
+function isValidCustomerId(value) {
+  return /^\d{3,20}$/.test(String(value || "").trim());
+}
+
+async function handleCloseGameSessions() {
+  if (!ensureAuthenticated()) return;
+  syncSessionCloseCustomerId();
+  const customerId = readSessionCloseCustomerId();
+  if (!isValidCustomerId(customerId)) {
+    showResult("Escribe un ID numérico válido para cerrar sesiones.", "error");
+    renderCloseGameSessionsStatus("ID inválido. Usa solo números.", "error");
+    elements.sessionCloseCustomerId?.focus();
+    return;
+  }
+
+  const confirmed = window.confirm(`Cerrar sesiones abiertas para el ID ${customerId}?`);
+  if (!confirmed) return;
+
+  const previousHtml = elements.closeGameSessionsBtn?.innerHTML || "";
+  if (elements.closeGameSessionsBtn) {
+    elements.closeGameSessionsBtn.disabled = true;
+    elements.closeGameSessionsBtn.textContent = "Cerrando...";
+  }
+  renderCloseGameSessionsStatus(`Cerrando sesiones para ${customerId}...`, "loading");
+
+  try {
+    const data = await fetchJson("/api/support-ticket?action=game-sessions-close", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customerId,
+        chatId: elements.chatId.value.trim(),
+        customerEmail: elements.customerEmail.value.trim(),
+        customerName: elements.customerName.value.trim()
+      })
+    });
+
+    const summary = formatGameSessionsCloseSummary(data.result || {});
+    renderCloseGameSessionsStatus(summary, "success");
+    showResult(summary, "success");
+  } catch (error) {
+    const message = formatError(error.message);
+    renderCloseGameSessionsStatus(message, "error");
+    showResult(`No pude cerrar sesiones: ${message}`, "error");
+  } finally {
+    if (elements.closeGameSessionsBtn) {
+      elements.closeGameSessionsBtn.disabled = false;
+      elements.closeGameSessionsBtn.innerHTML = previousHtml;
+    }
+  }
+}
+
+function renderCloseGameSessionsStatus(message, type = "idle") {
+  if (!elements.closeGameSessionsStatus) return;
+  elements.closeGameSessionsStatus.textContent = message;
+  elements.closeGameSessionsStatus.dataset.state = type;
+}
+
+function formatGameSessionsCloseSummary(result = {}) {
+  const estado = result.estado || "procesado";
+  const cerradas = Number.isFinite(Number(result.cantidadCerradas)) ? Number(result.cantidadCerradas) : null;
+  if (estado === "completado") {
+    return `Sesiones cerradas${cerradas !== null ? `: ${cerradas}` : ""}.`;
+  }
+  if (estado === "sin_sesion") {
+    return "No había sesiones abiertas para cerrar.";
+  }
+  if (estado === "requiere_revision") {
+    return `Requiere revisión${cerradas !== null ? `: ${cerradas} cerradas` : ""}. ${result.notas || ""}`.trim();
+  }
+  if (estado === "error") {
+    return result.notas || result.resultado || "El cierre terminó con error.";
+  }
+  return result.notas || result.resultado || `Resultado: ${estado}`;
+}
+
+async function submitKycReviewStatus(status) {
+  if (!ensureAuthenticated()) return;
+  syncKycEmailInput();
+  const email = readKycEmail();
+  if (!looksLikeEmail(email)) {
+    showResult("Escribe un correo válido para registrar KYC.", "error");
+    return;
+  }
+
+  const button = status === "complete" ? elements.kycCompleteBtn : elements.kycIncompleteBtn;
+  const previousHtml = button?.innerHTML || "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Guardando...";
+  }
+
+  try {
+    const data = await fetchJson("/api/support-config?action=kyc-review-status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email,
+        status,
+        customerName: elements.customerName.value.trim(),
+        customerId: elements.authId.value.trim(),
+        chatId: elements.chatId.value.trim()
+      })
+    });
+    const label = data.review?.status === "complete" ? "KYC completo" : "KYC incompleto";
+    showResult(`${label} registrado para ${email}.`, "success");
+  } catch (error) {
+    showResult(`No pude registrar KYC: ${formatError(error.message)}`, "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = previousHtml;
+    }
+  }
+}
+
+async function copyTextToClipboard(text) {
+  if (!navigator.clipboard?.writeText) return;
+  await navigator.clipboard.writeText(text);
+}
+
 function handleCustomerProfile(profile) {
   const nextProfileKey = buildProfileKey(profile);
   const changedProfile = Boolean(activeProfileKey && nextProfileKey && activeProfileKey !== nextProfileKey);
@@ -1126,6 +1319,8 @@ function handleCustomerProfile(profile) {
     "playerId"
   ]);
 
+  syncSessionCloseCustomerId({ force: true });
+  syncKycEmailInput({ force: true });
   applyAutofill({ force: true });
   applySlackAutofill({ force: true });
   applyDefaultTicketSearch({ force: true });
@@ -1147,6 +1342,50 @@ function renderLiveChatAutomationPanel() {
   const message = autoWelcome.message || "Buenas noches, bienvenido a Betxico💚\n¿En que te puedo ayudar? 🙂‍↔️";
   elements.liveChatWelcomePreview.textContent = message;
   renderLiveChatAutomationStatus(elements.chatId?.value ? "Listo para enviar bienvenida." : "Esperando chat activo.");
+}
+
+async function handleSendSupportAlert(event) {
+  event.preventDefault();
+
+  const customerName = elements.customerName.value.trim();
+  const customerEmail = elements.customerEmail.value.trim();
+  const customerId = elements.authId.value.trim();
+  const chatId = elements.chatId.value.trim();
+  const note = elements.supportAlertMessage.value.trim();
+
+  if (!customerEmail && !customerName && !customerId) {
+    showResult("No hay datos de cliente para enviar la alerta.", "error");
+    return;
+  }
+
+  elements.sendSupportAlertBtn.disabled = true;
+  elements.sendSupportAlertBtn.textContent = "Enviando...";
+
+  try {
+    await fetchJson("/api/support-config?action=assistant-alerts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Alerta de LiveChat",
+        message: note || "Revisar cliente desde Betxico Soporte.",
+        severity: "critical",
+        customerName,
+        customerEmail,
+        customerId,
+        chatId,
+        agentName: currentAccount?.displayName || currentAccount?.email || "",
+        source: "betxico-soporte"
+      })
+    });
+
+    elements.supportAlertMessage.value = "";
+    showResult("Alerta enviada a APP Betxico.", "success");
+  } catch (error) {
+    showResult(`No pude enviar alerta a APP Betxico: ${formatError(error.message)}`, "error");
+  } finally {
+    elements.sendSupportAlertBtn.disabled = false;
+    elements.sendSupportAlertBtn.textContent = "Enviar Alerta";
+  }
 }
 
 async function loadCustomerContext({ force = false } = {}) {
@@ -3409,7 +3648,17 @@ function formatError(message) {
     slack_oauth_url_missing: "Slack no devolvió URL de autorización.",
     missing_pin: "debes poner un PIN para guardar la cuenta.",
     user_not_authorized: "este correo no esta autorizado para usar la app de soporte.",
-    admin_not_authorized: "tu usuario no tiene permiso de administración."
+    admin_not_authorized: "tu usuario no tiene permiso de administración.",
+    invalid_customer_email: "el correo del cliente no es válido.",
+    invalid_kyc_status: "el estatus KYC no es válido.",
+    invalid_customer_id: "el ID del cliente no es válido.",
+    missing_betxico_assistant_api_url: "falta BETXICO_ASSISTANT_API_URL para conectar con APP Betxico.",
+    missing_betxico_assistant_token: "falta token admin para conectar con APP Betxico.",
+    missing_access_token: "APP Betxico rechazó la llamada porque falta token.",
+    sensitive_action_requires_local_token: "APP Betxico rechazó el cierre: el token no tiene permiso admin.",
+    "Game session closure is disabled by ACTION_CLOSE_GAME_SESSIONS": "el cierre de sesiones está desactivado en APP Betxico.",
+    betxico_assistant_timeout: "APP Betxico tardó demasiado en responder.",
+    game_sessions_close_failed: "APP Betxico no pudo cerrar sesiones."
   };
   return dictionary[raw] || raw;
 }
