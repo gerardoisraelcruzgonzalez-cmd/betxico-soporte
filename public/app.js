@@ -60,6 +60,18 @@ const elements = {
   sessionCloseCustomerId: document.getElementById("sessionCloseCustomerId"),
   closeGameSessionsBtn: document.getElementById("closeGameSessionsBtn"),
   closeGameSessionsStatus: document.getElementById("closeGameSessionsStatus"),
+  sessionCloseOverlay: document.getElementById("sessionCloseOverlay"),
+  sessionCloseBadge: document.getElementById("sessionCloseBadge"),
+  sessionCloseTitle: document.getElementById("sessionCloseTitle"),
+  sessionCloseSubtitle: document.getElementById("sessionCloseSubtitle"),
+  sessionCloseCount: document.getElementById("sessionCloseCount"),
+  sessionCloseRange: document.getElementById("sessionCloseRange"),
+  sessionClosePendingCount: document.getElementById("sessionClosePendingCount"),
+  sessionClosePendingList: document.getElementById("sessionClosePendingList"),
+  sessionCloseGamesList: document.getElementById("sessionCloseGamesList"),
+  sessionCloseDate: document.getElementById("sessionCloseDate"),
+  sessionCloseModalCloseBtn: document.getElementById("sessionCloseModalCloseBtn"),
+  sessionCloseModalOkBtn: document.getElementById("sessionCloseModalOkBtn"),
   kycEmailInput: document.getElementById("kycEmailInput"),
   openKycSearchBtn: document.getElementById("openKycSearchBtn"),
   kycCompleteBtn: document.getElementById("kycCompleteBtn"),
@@ -371,6 +383,11 @@ function initialize() {
   elements.quickDepositAmount?.addEventListener("input", renderQuickDepositPreview);
   elements.traceabilityBtn?.addEventListener("click", handleTraceabilityOpen);
   elements.closeGameSessionsBtn?.addEventListener("click", handleCloseGameSessions);
+  elements.sessionCloseModalCloseBtn?.addEventListener("click", closeGameSessionsModal);
+  elements.sessionCloseModalOkBtn?.addEventListener("click", closeGameSessionsModal);
+  elements.sessionCloseOverlay?.addEventListener("click", (event) => {
+    if (event.target === elements.sessionCloseOverlay) closeGameSessionsModal();
+  });
   elements.openKycSearchBtn?.addEventListener("click", openKycBackofficeSearch);
   elements.kycCompleteBtn?.addEventListener("click", () => submitKycReviewStatus("complete"));
   elements.kycIncompleteBtn?.addEventListener("click", () => submitKycReviewStatus("incomplete"));
@@ -1186,7 +1203,7 @@ async function handleCloseGameSessions() {
     elements.closeGameSessionsBtn.disabled = true;
     elements.closeGameSessionsBtn.textContent = "Cerrando...";
   }
-  renderCloseGameSessionsStatus(`Cerrando sesiones para ${customerId}...`, "loading");
+  renderCloseGameSessionsStatus(`Cerrando sesiones para ${customerId}... Si otro agente ya inició un cierre, esta solicitud quedará en cola.`, "loading");
 
   try {
     const data = await fetchJson("/api/support-ticket?action=game-sessions-close", {
@@ -1203,6 +1220,7 @@ async function handleCloseGameSessions() {
     const summary = formatGameSessionsCloseSummary(data.result || {});
     renderCloseGameSessionsStatus(summary, "success");
     showResult(summary, "success");
+    showGameSessionsCloseDetail(data.result || {}, customerId);
   } catch (error) {
     const message = formatError(error.message);
     renderCloseGameSessionsStatus(message, "error");
@@ -1224,19 +1242,85 @@ function renderCloseGameSessionsStatus(message, type = "idle") {
 function formatGameSessionsCloseSummary(result = {}) {
   const estado = result.estado || "procesado";
   const cerradas = Number.isFinite(Number(result.cantidadCerradas)) ? Number(result.cantidadCerradas) : null;
+  const queuePrefix = result.encolado ? "En cola ejecutado: " : "";
   if (estado === "completado") {
-    return `Sesiones cerradas${cerradas !== null ? `: ${cerradas}` : ""}.`;
+    return `${queuePrefix}Sesiones cerradas${cerradas !== null ? `: ${cerradas}` : ""}.`;
   }
   if (estado === "sin_sesion") {
-    return "No había sesiones abiertas para cerrar.";
+    return `${queuePrefix}No había sesiones abiertas para cerrar.`;
   }
   if (estado === "requiere_revision") {
-    return `Requiere revisión${cerradas !== null ? `: ${cerradas} cerradas` : ""}. ${result.notas || ""}`.trim();
+    return `${queuePrefix}Requiere revisión${cerradas !== null ? `: ${cerradas} cerradas` : ""}. ${result.notas || ""}`.trim();
   }
   if (estado === "error") {
-    return result.notas || result.resultado || "El cierre terminó con error.";
+    return `${queuePrefix}${result.notas || result.resultado || "El cierre terminó con error."}`;
   }
-  return result.notas || result.resultado || `Resultado: ${estado}`;
+  return `${queuePrefix}${result.notas || result.resultado || `Resultado: ${estado}`}`;
+}
+
+function showGameSessionsCloseDetail(result = {}, customerId = "") {
+  if (!elements.sessionCloseOverlay) return;
+  const estado = String(result.estado || "").trim();
+  const detalle = result.detalle && typeof result.detalle === "object" ? result.detalle : {};
+  const rango = detalle.rango && typeof detalle.rango === "object" ? detalle.rango : {};
+  const juegos = Array.isArray(detalle.juegos) ? detalle.juegos.filter(Boolean) : [];
+  const pendingWins = Array.isArray(detalle.pendingWins) ? detalle.pendingWins.filter(Boolean) : [];
+  const cerradas = Number.isFinite(Number(result.cantidadCerradas)) ? Number(result.cantidadCerradas) : 0;
+  const title = estado === "completado"
+    ? "Cierre completado"
+    : estado === "sin_sesion"
+      ? "Sin sesiones pendientes"
+      : estado === "requiere_revision"
+        ? "Requiere revisión"
+        : "Cierre de sesiones";
+
+  if (elements.sessionCloseBadge) {
+    elements.sessionCloseBadge.textContent = `ID ${result.id || customerId || "—"} · ${estado || "procesado"}`;
+  }
+  if (elements.sessionCloseTitle) {
+    elements.sessionCloseTitle.textContent = title;
+  }
+  if (elements.sessionCloseSubtitle) {
+    elements.sessionCloseSubtitle.textContent = result.mensajeCola || result.notas || "Resultado del cierre solicitado.";
+  }
+  if (elements.sessionCloseCount) {
+    elements.sessionCloseCount.textContent = String(cerradas);
+  }
+  if (elements.sessionCloseRange) {
+    const inicio = rango.inicio || "";
+    const fin = rango.fin || "";
+    elements.sessionCloseRange.textContent = inicio && fin ? `${inicio} a ${fin}` : "—";
+  }
+  if (elements.sessionClosePendingCount) {
+    elements.sessionClosePendingCount.textContent = pendingWins.length > 0 ? String(pendingWins.length) : "Ninguno";
+  }
+  if (elements.sessionClosePendingList) {
+    elements.sessionClosePendingList.className = pendingWins.length > 0 ? "session-close-list" : "session-close-empty";
+    elements.sessionClosePendingList.innerHTML = pendingWins.length > 0
+      ? pendingWins.map((item) => sessionCloseListItem(`${item.game || "Juego sin código"} · ${item.amount || "0"}`, "⚠")).join("")
+      : "Ninguna sesión pendiente reportó Pending Win.";
+  }
+  if (elements.sessionCloseGamesList) {
+    elements.sessionCloseGamesList.innerHTML = juegos.length > 0
+      ? juegos.map((game) => sessionCloseListItem(game, "🎮")).join("")
+      : `<div class="session-close-empty">No se reportaron juegos pendientes.</div>`;
+  }
+  if (elements.sessionCloseDate) {
+    elements.sessionCloseDate.textContent = result.fechaProceso || new Date().toLocaleString("es-MX");
+  }
+
+  elements.sessionCloseOverlay.hidden = false;
+  document.body.classList.add("session-close-modal-open");
+}
+
+function sessionCloseListItem(text, icon) {
+  return `<div class="session-close-list-item"><span>${escapeHtml(icon)}</span><strong>${escapeHtml(String(text || "—"))}</strong></div>`;
+}
+
+function closeGameSessionsModal() {
+  if (!elements.sessionCloseOverlay) return;
+  elements.sessionCloseOverlay.hidden = true;
+  document.body.classList.remove("session-close-modal-open");
 }
 
 async function submitKycReviewStatus(status) {

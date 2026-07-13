@@ -514,8 +514,51 @@
       </article>
     </section>
 
+    <section id="sessionCloseOverlay" class="session-close-overlay" hidden>
+      <article class="session-close-card" role="dialog" aria-modal="true" aria-labelledby="sessionCloseTitle">
+        <header class="session-close-header">
+          <div>
+            <div id="sessionCloseBadge" class="session-close-badge">Cierre de sesiones BoB</div>
+            <h2 id="sessionCloseTitle">Cierre de sesiones</h2>
+            <p id="sessionCloseSubtitle">Resultado del cierre solicitado.</p>
+          </div>
+          <button id="sessionCloseModalCloseBtn" type="button" class="session-close-x" aria-label="Cerrar">×</button>
+        </header>
+
+        <div class="session-close-metrics">
+          <div>
+            <span>Sesiones cerradas</span>
+            <strong id="sessionCloseCount">0</strong>
+          </div>
+          <div>
+            <span>Rango</span>
+            <strong id="sessionCloseRange">—</strong>
+          </div>
+          <div>
+            <span>Pending Win</span>
+            <strong id="sessionClosePendingCount">Ninguno</strong>
+          </div>
+        </div>
+
+        <section class="session-close-section">
+          <h3>Pending Win</h3>
+          <div id="sessionClosePendingList" class="session-close-empty">Ninguna sesión pendiente reportó Pending Win.</div>
+        </section>
+
+        <section class="session-close-section">
+          <h3>Juegos cerrados</h3>
+          <div id="sessionCloseGamesList" class="session-close-list"></div>
+        </section>
+
+        <footer class="session-close-footer">
+          <span id="sessionCloseDate">—</span>
+          <button id="sessionCloseModalOkBtn" type="button">Cerrar</button>
+        </footer>
+      </article>
+    </section>
+
     <script src="https://unpkg.com/@livechat/agent-app-sdk@1.15.0/dist/agentapp.umd.min.js"></script>
     <script src="/vendor/exceljs.min.js"></script>
-    <script type="module" src="/app.js?v=20260711-kyc-review-v2"></script>
+    <script type="module" src="/app.js?v=20260713-session-close-detail-v1"></script>
   </body>
 </html>
