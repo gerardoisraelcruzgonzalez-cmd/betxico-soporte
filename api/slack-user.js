@@ -32,8 +32,8 @@ export default async function handler(req, res) {
   if (action === "sync") {
     return handleSync(req, res);
   }
-  if (!action && hasSlackCallback && callbackState?.nonce) {
-    return handleSignInCallback(req, res, callbackState);
+  if (!action && hasSlackCallback && callbackState?.flow === "signin") {
+    return handleUnifiedSlackSignInCallback(req, res, callbackState);
   }
   if (action === "callback" || (!action && hasSlackCallback)) {
     return handleCallback(req, res, callbackState);
@@ -48,21 +48,20 @@ async function handleSignInStart(req, res) {
 
   try {
     await readJson(req).catch(() => ({}));
-    const config = getSlackSignInConfig(req);
+    const config = getSlackOAuthConfig(req);
     if (!config.configured) {
       const error = new Error("slack_signin_not_configured");
       error.statusCode = 500;
       throw error;
     }
 
-    const state = signState({ nonce: crypto.randomBytes(16).toString("base64url") }, 600);
-    const url = new URL("https://slack.com/openid/connect/authorize");
+    const state = signState({ flow: "signin", nonce: crypto.randomBytes(16).toString("base64url") }, 600);
+    const url = new URL("https://slack.com/oauth/v2/authorize");
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "openid email profile");
+    url.searchParams.set("user_scope", config.userScopes);
     url.searchParams.set("client_id", config.clientId);
     url.searchParams.set("redirect_uri", config.callbackUrl);
     url.searchParams.set("state", state);
-    url.searchParams.set("nonce", state.split(".")[0]);
     return sendJson(res, 200, { ok: true, url: url.toString() });
   } catch (error) {
     return sendJson(res, error.statusCode || 500, {
@@ -70,6 +69,82 @@ async function handleSignInStart(req, res) {
       error: error.message || "slack_signin_start_failed",
       details: error.details || undefined
     });
+  }
+}
+
+async function handleUnifiedSlackSignInCallback(req, res, verifiedState = null) {
+  if (req.method !== "GET") {
+    res.statusCode = 405;
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    return res.end(JSON.stringify({ ok: false, error: "method_not_allowed" }));
+  }
+
+  try {
+    const requestUrl = getRequestUrl(req);
+    const code = String(requestUrl.searchParams.get("code") || "").trim();
+    const state = verifiedState || verifyState(String(requestUrl.searchParams.get("state") || "").trim());
+    if (!code || state?.flow !== "signin") {
+      const error = new Error("invalid_slack_signin_state");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const config = getSlackOAuthConfig(req);
+    if (!config.configured) {
+      const error = new Error("slack_signin_not_configured");
+      error.statusCode = 500;
+      throw error;
+    }
+
+    const response = await fetch("https://slack.com/api/oauth.v2.access", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded; charset=utf-8" },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        code,
+        redirect_uri: config.callbackUrl
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    const accessToken = data.authed_user?.access_token || "";
+    const slackUserId = data.authed_user?.id || "";
+    if (!response.ok || !data.ok || !accessToken || !slackUserId) {
+      const error = new Error(data.error || `slack_signin_http_${response.status}`);
+      error.statusCode = response.status || 500;
+      error.details = data;
+      throw error;
+    }
+
+    const profile = await fetchSlackUserProfile(accessToken, slackUserId);
+    const email = String(profile?.user?.profile?.email || "").trim().toLowerCase();
+    if (!email) {
+      const error = new Error("slack_signin_email_missing");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existing = await getAccount(email).catch(() => null);
+    const account = await createOrUpdateAccount({
+      email,
+      displayName: profile.user.real_name || profile.user.name || existing?.displayName || email,
+      jiraEmail: existing?.jiraEmail || email
+    }, existing || {}, { allowPasswordless: true });
+    account.slackAuthenticatedAt = new Date().toISOString();
+    account.slackAuthProvider = "slack";
+    await saveAccount(account.email, account);
+    await saveSlackUserToken({
+      email,
+      accessToken,
+      slackUserId,
+      teamId: data.team?.id || "",
+      scope: data.authed_user.scope || data.scope || ""
+    });
+
+    setSessionCookie(res, account.email);
+    return sendHtml(res, 200, "Sesión iniciada con Slack", "Tu acceso, publicación personal y cuenta Jira quedaron vinculados.", publicAccount(account, account.email));
+  } catch (error) {
+    return sendHtml(res, error.statusCode || 500, "No pude iniciar con Slack", error.message || "slack_signin_failed");
   }
 }
 
@@ -184,6 +259,20 @@ async function fetchSlackUserInfo(accessToken) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok) {
     const error = new Error(data.error || `slack_userinfo_http_${response.status}`);
+    error.statusCode = response.status || 500;
+    error.details = data;
+    throw error;
+  }
+  return data;
+}
+
+async function fetchSlackUserProfile(accessToken, userId) {
+  const response = await fetch(`https://slack.com/api/users.info?user=${encodeURIComponent(userId)}`, {
+    headers: { authorization: `Bearer ${accessToken}` }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok || !data.user) {
+    const error = new Error(data.error || `slack_user_profile_http_${response.status}`);
     error.statusCode = response.status || 500;
     error.details = data;
     throw error;
@@ -323,11 +412,12 @@ function getSlackOAuthConfig(req) {
   const clientSecret = optionalEnv("SLACK_CLIENT_SECRET");
   const origin = getOrigin(req);
   const callbackUrl = optionalEnv("SLACK_USER_OAUTH_CALLBACK_URL", `${origin}/api/slack-user`);
-  const userScopes = optionalEnv("SLACK_USER_SCOPES", "chat:write,lists:read")
+  const userScopes = [...new Set(optionalEnv("SLACK_USER_SCOPES", "chat:write,lists:read,users:read.email")
     .split(",")
     .map((scope) => scope.trim())
     .filter(Boolean)
-    .join(",") || "chat:write,lists:read";
+    .concat("users:read.email"))]
+    .join(",") || "chat:write,lists:read,users:read.email";
 
   return {
     clientId,
