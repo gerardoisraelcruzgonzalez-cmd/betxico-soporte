@@ -1,5 +1,23 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/auth-login",
+      "destination": "/api/auth?action=login"
+    },
+    {
+      "source": "/api/auth-logout",
+      "destination": "/api/auth?action=logout"
+    },
+    {
+      "source": "/api/jira-metadata",
+      "destination": "/api/jira?action=metadata"
+    },
+    {
+      "source": "/api/jira-search",
+      "destination": "/api/jira?action=search"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -9,10 +9,12 @@ La ruta recomendada es instalar esta app como widget interno de LiveChat Agent A
 - `public/index.html`: panel para el agente dentro de LiveChat con campos reales de Jira.
 - `public/app.js`: lectura basica del perfil del cliente, carga de metadata de Jira y envio al backend.
 - `api/support-ticket.js`: endpoint para crear ticket de Jira, reportar en Slack y registrar auditoria.
-- `api/support-ticket.js?action=ai-chat`: endpoint interno para consultar GPT desde la app sin exponer la llave en el navegador.
+- `api/support-ticket.js?action=ai-chat`: endpoint interno para consultar el asistente IA desde la app sin exponer la llave en el navegador.
 - `api/support-ticket.js?action=game-sessions-close`: accion interna para cerrar sesiones BoB desde LiveChat reutilizando el backend de APP Betxico.
 - `api/jira-metadata.js`: endpoint para leer tipos de incidencia y campos configurados en Jira.
 - `api/livechat-webhook.js`: endpoint base para recibir eventos de LiveChat.
+- `public/simulator.html`: conversacion privada para probar como cliente y agente sin crear un chat de LiveChat.
+- `api/support-simulator.js`: consultas, borradores, evidencia y acciones supervisadas del simulador aislado.
 - `lib/jira.js`: cliente minimo para Jira Cloud.
 - `lib/slack.js`: cliente para canales y Slack Lists con rutas por grupo/tipo de ticket.
 - `docs/plan-soporte-livechat-app.md`: plan tecnico y operativo.
@@ -20,15 +22,39 @@ La ruta recomendada es instalar esta app como widget interno de LiveChat Agent A
 
 ## Desarrollo local
 
+La prueba local y la publicación usan superficies separadas: `npm run dev` sirve `public/` en `127.0.0.1:3000`, mientras Vercel sirve los archivos web de la raíz. Las mejoras que deban llegar a producción deben reflejarse deliberadamente en ambas superficies y validarse antes de publicar. Los archivos `.env.*.local`, conectores locales, fixtures y salidas de prueba son para desarrollo y nunca deben subirse con secretos o evidencia de clientes.
+
 ```bash
 npm install
 npm run dev
+```
+
+`npm run dev` sirve los archivos visuales sin invocar Vercel. Para probar tambien las rutas `/api` usa:
+
+```bash
+npm run dev:vercel
 ```
 
 En desarrollo puedes abrir:
 
 ```text
 http://localhost:3000
+```
+
+El simulador privado se abre en:
+
+```text
+http://localhost:3000/simulator.html
+```
+
+Necesita sesion normal por correo/PIN o Slack, una cuenta administradora autorizada y `SUPPORT_SIMULATOR_ENABLED=true`. Los mensajes enviados como Cliente activan la respuesta de la app; los enviados como Agente se agregan manualmente sin una segunda respuesta automatica.
+
+En preview, `SUPPORT_SIMULATOR_KNOWLEDGE_ENABLED=true` conecta el indice generado desde el manual maestro exclusivamente al simulador. La consulta devuelve como maximo cinco fragmentos de orientacion por turno. El manual no confirma estados de cuenta ni autoriza acciones; Jira, Slack Lista 8, Atena y KYC siguen siendo evidencias independientes. El flujo productivo de atencion no invoca esta herramienta y la bandera se ignora cuando `VERCEL_ENV=production`.
+
+Para reconstruir el indice despues de revisar el DOCX:
+
+```bash
+npm run knowledge:build
 ```
 
 Para LiveChat real, el widget debe publicarse en HTTPS y configurarse en Text Developer Console.
@@ -54,6 +80,8 @@ Llena `.env.vercel.local` con los tokens reales sin subirlo ni pegarlo en chats.
 ```bash
 npm run deploy:env
 ```
+
+El despliegue preview fuerza modo `suggest`, acceso autenticado, lecturas y sincronizacion directa de Slack apagadas y envios automaticos heredados apagados. Estas protecciones no se aplican implicitamente al comando de produccion.
 
 Si quieres una URL estable para dejarla fija en Text Developer Console, usa produccion:
 
@@ -200,9 +228,12 @@ La app soporta sesion por agente:
 - El agente entra en `Configuracion`.
 - Crea/inicia sesion con correo y PIN.
 - Guarda su Jira email y API token una sola vez.
+- El buscador global y el expediente usan esas credenciales Jira del agente activo.
 - El token se guarda cifrado en KV/Redis usando `SUPPORT_ENCRYPTION_KEY`.
 - La sesion queda en cookie HttpOnly firmada con `SUPPORT_SESSION_SECRET`.
 - Al crear tickets, el backend usa las credenciales del agente activo.
+
+Si la llave de cifrado cambia o el token anterior deja de ser valido, el agente conserva acceso al panel y Jira aparece como no configurado para permitir guardar un token nuevo.
 
 Variables necesarias para este modulo:
 
@@ -252,11 +283,54 @@ dias y guarda solamente su hash en KV.
 Las peticiones posteriores envian `Authorization: Bearer btq_...`. Cada
 peticion vuelve a validar que el usuario siga autorizado.
 
-## Asistente GPT interno
+## Asistente IA interno
 
-La app incluye un panel `Asistente GPT` para que los agentes consulten dudas operativas, redacten respuestas para clientes o resuman el caso activo. La integracion vive dentro de `api/support-ticket.js?action=ai-chat` para que la llave no quede expuesta en el navegador y para no aumentar el numero de funciones serverless en Vercel.
+La app incluye un panel `Asistente IA` para que los agentes consulten dudas operativas, redacten respuestas para clientes o resuman el caso activo. La integracion vive dentro de `api/support-ticket.js?action=ai-chat` para que la llave no quede expuesta en el navegador y para no aumentar el numero de funciones serverless en Vercel.
 
-Variables necesarias en Vercel:
+Proveedor recomendado por ahora: Groq. Si `GROQ_API_KEY` existe, el backend usa Groq automaticamente. OpenAI queda como proveedor opcional de compatibilidad si se configura `AI_PROVIDER=openai`.
+
+## Agente operativo supervisado
+
+El expediente del chat puede consultar Jira y la cache de Slack, registrar evidencia, generar un borrador y preparar tres escrituras controladas: comentario Jira, notificacion Slack y mensaje LiveChat. El modelo no ejecuta ninguna de ellas.
+
+Flujo obligatorio:
+
+1. Actualizar el expediente y revisar la antiguedad de las fuentes.
+2. Revisar manualmente los adjuntos recibidos.
+3. Generar o redactar una sugerencia.
+4. Proponer el contenido exacto.
+5. Obtener aprobacion de otro agente o administrador.
+6. Ejecutar una sola vez y verificar el contenido en el proveedor.
+7. Si la ejecucion se interrumpe, conciliar sin reenviar.
+
+Para desarrollo y preview usa `SUPPORT_AGENT_MODE=suggest`. `approved_actions` solo debe habilitarse despues de validar proveedores reales. El expediente consulta la cache compartida de Slack Lista 8 (`F0BS8SERTNE`), actualizada cada cuatro minutos por Vercel Cron, y conserva Lista 7 (`F0BNV1FR02J`) como cache historica con refresco cada 24 horas; nunca consulta Slack directamente durante un chat. Las respuestas automaticas heredadas permanecen apagadas. Consulta [docs/agent-operations-program.md](docs/agent-operations-program.md) para controles, criterios y continuidad.
+
+Validacion local completa:
+
+```bash
+npm test
+npm run check
+```
+
+Variables recomendadas en Vercel para Groq:
+
+```text
+GROQ_API_KEY
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MAX_COMPLETION_TOKENS=650
+GROQ_JSON_MODE=true
+```
+
+Variables opcionales para forzar proveedor o modelo:
+
+```text
+AI_PROVIDER=groq
+SUPPORT_AI_PROVIDER=groq
+SUPPORT_AI_MODEL=qwen/qwen3-32b
+AI_MAX_OUTPUT_TOKENS=650
+```
+
+Variables opcionales para OpenAI:
 
 ```text
 OPENAI_API_KEY
@@ -266,9 +340,9 @@ OPENAI_REASONING_EFFORT=low
 OPENAI_VECTOR_STORE_ID=
 ```
 
-`OPENAI_MODEL`, `OPENAI_MAX_OUTPUT_TOKENS` y `OPENAI_REASONING_EFFORT` son opcionales. El default esta pensado para bajo costo y baja latencia en soporte.
+`GROQ_MODEL`, `GROQ_MAX_COMPLETION_TOKENS`, `OPENAI_MODEL`, `OPENAI_MAX_OUTPUT_TOKENS` y `OPENAI_REASONING_EFFORT` son opcionales. El default de Groq esta pensado para baja latencia en soporte.
 
-La configuracion editable del asistente vive en `support:config.aiAssistant` y se administra desde `admin.html > Entrenamiento GPT`. Ahi se pueden cambiar instrucciones, tono, reglas de seguridad, formato y `vectorStoreId` sin redeploy.
+La configuracion editable del asistente vive en `support:config.aiAssistant` y se administra desde `admin.html > Entrenamiento IA`. Ahi se pueden cambiar instrucciones, tono, reglas de seguridad, formato y `vectorStoreId` sin redeploy. Cuando el proveedor es Groq, `vectorStoreId` se ignora porque el flujo usa Chat Completions sin File Search.
 
 Los ejemplos aprobados se guardan en KV bajo `support:ai:examples`. Los agentes tambien pueden guardar una respuesta como buena desde el widget o registrar que una respuesta fue incorrecta para revision posterior. En cada consulta, el backend selecciona solo ejemplos relevantes para no mandar todo el historial.
 
@@ -280,7 +354,7 @@ docs/betxico_base_conocimiento_operativa_v1.md
 docs/betxico_intents_dataset_v1.json
 ```
 
-Para subirla a OpenAI Vector Store y guardar el ID en archivos locales ignorados:
+Para usar el proveedor opcional OpenAI con File Search, sube la base documental a OpenAI Vector Store y guarda el ID en archivos locales ignorados:
 
 ```bash
 npm run ai:sync-knowledge
@@ -390,3 +464,7 @@ En Text Developer Console:
 6. Opcional: agregar `Chat Webhooks` apuntando a `/api/livechat-webhook`.
 
 Checklist detallado: `docs/livechat-console-checklist.md`.
+
+Operación estable del conector Atena: `docs/atena-livechat-connector-stable.md`.
+
+Operación estable del conector KYC: `docs/kyc-livechat-connector-stable.md`.

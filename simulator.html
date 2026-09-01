@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Simulador privado | Betxico Soporte</title>
+  <link rel="stylesheet" href="/simulator.css">
+</head>
+<body>
+  <main class="simulator-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <span class="brand-mark" aria-hidden="true">BX</span>
+        <div>
+          <p class="eyebrow">BETXICO SOPORTE</p>
+          <h1>Simulador privado</h1>
+        </div>
+      </div>
+      <div class="topbar-status">
+        <span class="environment-badge">NO ES LIVECHAT</span>
+        <span id="sessionLabel" class="session-label">Sin sesión</span>
+        <button id="logoutBtn" class="text-button" type="button" hidden>Cerrar sesión</button>
+      </div>
+    </header>
+
+    <section id="loginView" class="login-view">
+      <div class="login-copy">
+        <p class="eyebrow">ACCESO RESTRINGIDO</p>
+        <h2>Prueba el flujo como cliente.</h2>
+        <p>La conversación utiliza el mismo expediente, clasificador, consultas y controles de respuesta preparados para LiveChat.</p>
+      </div>
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <label>
+          Correo de agente
+          <input id="loginEmail" type="email" autocomplete="username" placeholder="correo@betxico.mx" required>
+        </label>
+        <label>
+          PIN personal
+          <input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN" required>
+        </label>
+        <button id="loginBtn" class="primary-button" type="submit">Entrar al simulador</button>
+        <div class="login-separator"><span>o</span></div>
+        <button id="slackLoginBtn" class="slack-button" type="button">Iniciar sesión con Slack</button>
+        <p id="loginMessage" class="form-message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="accessDeniedView" class="denied-view" hidden>
+      <p class="eyebrow">ACCESO NO DISPONIBLE</p>
+      <h2>Esta cuenta no puede abrir el simulador.</h2>
+      <p id="accessDeniedMessage">El simulador está apagado o tu correo no está autorizado.</p>
+      <button id="deniedLogoutBtn" class="secondary-button" type="button">Cambiar de cuenta</button>
+    </section>
+
+    <section id="startView" class="start-view" hidden>
+      <div class="start-copy">
+        <p class="eyebrow">NUEVA PRUEBA</p>
+        <h2>Define al cliente de esta conversación.</h2>
+        <p>Las búsquedas de Jira, KYC y la caché de Slack Lista 8 usarán estos datos reales. La conversación permanecerá aislada de LiveChat.</p>
+      </div>
+      <form id="startForm" class="start-form">
+        <label>
+          Correo del cliente
+          <input id="customerEmail" type="email" autocomplete="off" placeholder="cliente@correo.com" required>
+        </label>
+        <label>
+          ID del cliente
+          <input id="customerAuthId" type="text" inputmode="numeric" autocomplete="off" placeholder="AUTH ID">
+        </label>
+        <label class="wide-field">
+          Nombre
+          <input id="customerName" type="text" autocomplete="off" placeholder="Nombre del cliente">
+        </label>
+        <button id="startBtn" class="primary-button wide-field" type="submit">Iniciar conversación</button>
+        <p id="startMessage" class="form-message wide-field" role="status"></p>
+      </form>
+    </section>
+
+    <section id="workspaceView" class="workspace" hidden>
+      <section class="conversation-pane" aria-label="Conversación simulada">
+        <header class="conversation-header">
+          <div>
+            <p class="eyebrow">CLIENTE SIMULADO</p>
+            <h2 id="conversationCustomer">Cliente</h2>
+            <p id="conversationIdentity" class="muted-line"></p>
+          </div>
+          <div class="header-actions">
+            <button id="refreshBtn" class="secondary-button" type="button">Actualizar fuentes</button>
+            <button id="newCaseBtn" class="text-button" type="button">Nueva prueba</button>
+          </div>
+        </header>
+
+        <div id="conversationStatus" class="conversation-status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <strong>Listo</strong>
+          <span id="workflowLabel">Esperando mensaje</span>
+        </div>
+
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+
+        <div id="fileTray" class="file-tray" hidden></div>
+        <div class="sender-bar">
+          <span>Enviar como</span>
+          <div class="sender-switch" role="group" aria-label="Seleccionar remitente">
+            <button id="sendAsCustomerBtn" type="button" data-active="true">Cliente</button>
+            <button id="sendAsAgentBtn" type="button" data-active="false">Agente</button>
+          </div>
+          <span id="replyModeLabel" class="reply-mode">La app analizará y responderá al cliente</span>
+        </div>
+        <form id="messageForm" class="composer">
+          <label class="composer-input">
+            <span class="sr-only">Mensaje del cliente</span>
+            <textarea id="messageInput" rows="2" placeholder="Escribe como si fueras el cliente..."></textarea>
+          </label>
+          <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple hidden>
+          <button id="attachBtn" class="icon-text-button" type="button">Adjuntar</button>
+          <button id="sendBtn" class="primary-button send-button" type="submit">Enviar</button>
+        </form>
+        <p id="conversationMessage" class="form-message composer-message" role="status"></p>
+      </section>
+
+      <aside class="inspector" aria-label="Expediente y controles">
+        <section class="case-strip">
+          <div>
+            <p class="eyebrow">EXPEDIENTE</p>
+            <strong id="caseState">Nuevo</strong>
+          </div>
+          <span id="caseRevision" class="revision-badge">R0</span>
+        </section>
+
+        <section class="flow-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">RECORRIDO DEL CASO</p>
+              <h3>Investigación paso a paso</h3>
+            </div>
+            <span class="read-only-badge">SOLO LECTURA</span>
+          </div>
+          <ol id="investigationTrace" class="investigation-trace" aria-live="polite"></ol>
+        </section>
+
+        <section class="usage-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">CONSUMO DE IA</p>
+              <h3>Esta conversación</h3>
+            </div>
+            <strong id="usageCost">$0.0000 USD</strong>
+          </div>
+          <div class="usage-grid">
+            <span><b id="usageCalls">0</b>Llamadas</span>
+            <span><b id="usageInput">0</b>Entrada</span>
+            <span><b id="usageOutput">0</b>Salida</span>
+            <span><b id="usageTotal">0</b>Tokens</span>
+          </div>
+          <p id="usageModel" class="usage-model">Aún no se ha consultado la IA.</p>
+          <div class="usage-budget">
+            <label for="usageBudget">Presupuesto API (USD)</label>
+            <input id="usageBudget" type="number" min="0" step="1" inputmode="decimal" placeholder="10">
+          </div>
+          <p id="usageEstimate" class="usage-estimate">Ingresa tu presupuesto para estimar conversaciones similares.</p>
+        </section>
+
+        <details class="source-panel" open>
+          <summary>
+            <span>Jira</span>
+            <span id="jiraCount" class="source-count">0</span>
+          </summary>
+          <div id="jiraResults" class="source-results"></div>
+        </details>
+
+        <details class="source-panel" open>
+          <summary>
+            <span>Slack Lista 8</span>
+            <span id="slackCount" class="source-count">0</span>
+          </summary>
+          <div id="slackResults" class="source-results"></div>
+        </details>
+
+        <details class="source-panel" open>
+          <summary>
+            <span>Atena</span>
+            <span id="atenaStatus" class="source-count">Sin dato</span>
+          </summary>
+          <div id="atenaResult" class="source-results"></div>
+        </details>
+
+        <details class="source-panel" open>
+          <summary>
+            <span>KYC</span>
+            <span id="kycStatus" class="source-count">Sin dato</span>
+          </summary>
+          <div id="kycResult" class="source-results"></div>
+        </details>
+
+        <details class="source-panel knowledge-panel" open>
+          <summary>
+            <span>Manual operativo</span>
+            <span id="knowledgeCount" class="source-count">0</span>
+          </summary>
+          <div id="knowledgeResults" class="source-results"></div>
+        </details>
+
+        <section class="evidence-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">ADJUNTOS</p>
+              <h3>Evidencia recibida</h3>
+            </div>
+            <button id="reviewEvidenceBtn" class="secondary-button compact-button" type="button" disabled>Marcar revisada</button>
+          </div>
+          <div id="evidenceList" class="evidence-list"></div>
+          <div class="kyc-review-actions" aria-label="Confirmación humana de KYC">
+            <button id="kycCompleteBtn" class="primary-button compact-button" type="button" disabled>KYC completo</button>
+            <button id="kycIncompleteBtn" class="secondary-button compact-button" type="button" disabled>KYC incompleto</button>
+          </div>
+        </section>
+
+        <section class="analysis-panel">
+          <p class="eyebrow">ANÁLISIS DEL ASISTENTE</p>
+          <h3 id="analysisTitle">Sin análisis todavía</h3>
+          <p id="analysisText">Envía un mensaje para iniciar el análisis del caso.</p>
+          <p id="nextStepText" class="next-step"></p>
+          <div id="sourceChips" class="source-chips"></div>
+        </section>
+
+        <form id="actionPanel" class="action-panel" autocomplete="off" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">ACCIÓN SUPERVISADA</p>
+              <h3>Jira o Slack</h3>
+            </div>
+            <span id="actionStatus" class="action-status">Sin propuesta</span>
+          </div>
+          <label>
+            Destino
+            <select id="actionType">
+              <option value="jira.comment">Comentar en Jira</option>
+              <option value="slack.notify">Enviar a Slack</option>
+            </select>
+          </label>
+          <label>
+            Ticket o ruta autorizada
+            <input id="actionTarget" type="text" autocomplete="off" placeholder="BTF-1234">
+          </label>
+          <label>
+            Texto
+            <textarea id="actionText" rows="4" placeholder="Seguimiento que se propone enviar"></textarea>
+          </label>
+          <div class="action-buttons">
+            <button id="proposeBtn" class="secondary-button" type="button">Proponer</button>
+            <button id="approveBtn" class="approval-button" type="button" disabled>Aprobar</button>
+          </div>
+          <div id="executionGate" class="execution-gate" hidden>
+            <p>La escritura real sólo se habilita para destinos de prueba autorizados.</p>
+            <label>
+              PIN personal
+              <input id="executionPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN">
+            </label>
+            <label>
+              Confirmación exacta
+              <input id="executionConfirmation" type="text" autocomplete="off" placeholder="EJECUTAR PRUEBA REAL">
+            </label>
+            <button id="executeBtn" class="danger-button" type="button">Ejecutar y verificar</button>
+          </div>
+          <p id="actionMessage" class="form-message" role="status"></p>
+        </form>
+      </aside>
+    </section>
+  </main>
+  <script type="module" src="/simulator.js"></script>
+</body>
+</html>

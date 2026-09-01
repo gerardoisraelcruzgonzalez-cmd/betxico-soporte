@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "description": "Casos anonimizados derivados de patrones de conversaciones reales previamente validadas.",
+  "privacy": {
+    "sourceDataIncluded": false,
+    "identitiesAreSynthetic": true,
+    "allowedEmailDomain": "example.test"
+  },
+  "slackScope": {
+    "listNumber": 7,
+    "listId": "F0BS8SERTNE",
+    "expectedPanels": 1
+  },
+  "now": "2026-08-11T18:00:00.000Z",
+  "cases": [
+    {
+      "id": "withdrawal-list7-non-kyc",
+      "title": "Retiro hallado en Lista 8 con motivo bancario, no KYC",
+      "customer": {
+        "email": "cliente.retiro.a@example.test",
+        "authId": "99000001"
+      },
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Mi retiro de $700 solicitado hoy aparece en revision."
+        }
+      ],
+      "sources": {
+        "jira": {
+          "status": "not_found",
+          "records": []
+        },
+        "slack": {
+          "status": "available",
+          "checkedAt": "2026-08-11T17:59:00.000Z",
+          "expiresAt": "2026-08-11T18:04:00.000Z",
+          "records": [
+            {
+              "listId": "F0BS8SERTNE",
+              "id": "L7-TEST-001",
+              "status": "Retenido",
+              "motivo": "Validacion de cuenta bancaria de retiro",
+              "comentario": "La CLABE fue rechazada por el banco receptor.",
+              "email": "cliente.retiro.a@example.test",
+              "authId": "99000001"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "workflow": "withdrawal",
+        "route": "bank_rejection",
+        "source": "slack_list_8",
+        "nextActionType": "prepare_verified_response",
+        "requiresKyc": false,
+        "reasonIncludes": ["CLABE", "banco receptor"]
+      }
+    },
+    {
+      "id": "withdrawal-list7-kyc",
+      "title": "Retiro hallado en Lista 8 con requisito KYC",
+      "customer": {
+        "email": "cliente.retiro.b@example.test",
+        "authId": "99000002"
+      },
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Mi retiro de $850 solicitado ayer aparece retenido."
+        }
+      ],
+      "sources": {
+        "jira": {
+          "status": "not_found",
+          "records": []
+        },
+        "slack": {
+          "status": "available",
+          "checkedAt": "2026-08-11T17:59:00.000Z",
+          "expiresAt": "2026-08-11T18:04:00.000Z",
+          "records": [
+            {
+              "listId": "F0BS8SERTNE",
+              "id": "L7-TEST-002",
+              "status": "Retenido",
+              "motivo": "Requiere validacion KYC",
+              "comentario": "Pendiente INE frente y reverso.",
+              "email": "cliente.retiro.b@example.test",
+              "authId": "99000002"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "workflow": "withdrawal",
+        "route": "kyc_document_required",
+        "source": "slack_list_8",
+        "nextActionType": "review_kyc",
+        "requiresKyc": true,
+        "documentRequirementKeys": ["ine_front", "ine_back"]
+      }
+    },
+    {
+      "id": "withdrawal-jira-kyc",
+      "title": "Jira contiene un requisito KYC verificable",
+      "customer": {
+        "email": "cliente.retiro.c@example.test",
+        "authId": "99000003"
+      },
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Mi retiro de $900 solicitado hoy sigue pendiente."
+        }
+      ],
+      "sources": {
+        "jira": {
+          "status": "available",
+          "records": [
+            {
+              "key": "BTF-90003",
+              "status": "En curso",
+              "summary": "Actualizar expediente KYC",
+              "description": "Se requiere comprobar la identidad antes de continuar.",
+              "comments": [
+                {
+                  "body": "Confirmar en KYC si corresponde selfie sosteniendo la INE."
+                }
+              ],
+              "customer": {
+                "email": "cliente.retiro.c@example.test",
+                "authId": "99000003"
+              }
+            }
+          ]
+        },
+        "slack": {
+          "status": "not_found",
+          "checkedAt": "2026-08-11T17:59:00.000Z",
+          "expiresAt": "2026-08-11T18:04:00.000Z",
+          "records": []
+        }
+      },
+      "expected": {
+        "workflow": "withdrawal",
+        "route": "kyc_document_required",
+        "source": "jira",
+        "nextActionType": "review_kyc",
+        "requiresKyc": true,
+        "documentRequirementKeys": ["official_id", "selfie_ine"]
+      }
+    },
+    {
+      "id": "withdrawal-slack-degraded",
+      "title": "Slack Lista 8 no disponible o con cache vencida",
+      "customer": {
+        "email": "cliente.retiro.d@example.test",
+        "authId": "99000004"
+      },
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Mi retiro de $650 solicitado ayer aparece en revision."
+        }
+      ],
+      "sources": {
+        "jira": {
+          "status": "not_found",
+          "records": []
+        },
+        "slackVariants": [
+          {
+            "name": "unavailable",
+            "throws": {
+              "message": "simulated provider outage",
+              "statusCode": 503
+            }
+          },
+          {
+            "name": "stale",
+            "status": "stale",
+            "checkedAt": "2026-08-11T17:40:00.000Z",
+            "expiresAt": "2026-08-11T17:42:00.000Z",
+            "coverage": {
+              "complete": true,
+              "expectedPanels": 1,
+              "cachedPanels": 1,
+              "missingPanels": 0
+            },
+            "records": []
+          }
+        ]
+      },
+      "expected": {
+        "workflow": "withdrawal",
+        "route": "source_unavailable",
+        "nextActionType": "continue_without_source",
+        "requiresKyc": false,
+        "mustNotTreatAsNotFound": true
+      }
+    },
+    {
+      "id": "kyc-ready-without-attachment",
+      "title": "El cliente dice listo pero no adjunta archivo",
+      "customer": {
+        "email": "cliente.retiro.e@example.test",
+        "authId": "99000005"
+      },
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Mi retiro de $500 solicitado hoy aparece retenido."
+        },
+        {
+          "role": "customer",
+          "text": "listo",
+          "attachments": []
+        }
+      ],
+      "sources": {
+        "jira": {
+          "status": "not_found",
+          "records": []
+        },
+        "slack": {
+          "status": "available",
+          "checkedAt": "2026-08-11T17:59:00.000Z",
+          "expiresAt": "2026-08-11T18:04:00.000Z",
+          "records": [
+            {
+              "listId": "F0BS8SERTNE",
+              "id": "L7-TEST-005",
+              "status": "Retenido",
+              "motivo": "Validacion KYC requerida",
+              "comentario": "Confirmar INE frente en KYC antes de solicitarla.",
+              "email": "cliente.retiro.e@example.test",
+              "authId": "99000005"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "workflow": "withdrawal",
+        "route": "kyc_document_required",
+        "acknowledgementWithoutEvidence": true,
+        "receivedAttachments": 0,
+        "replyIncludes": "ine por ambos lados",
+        "replyExcludes": ["recibi", "recibimos", "archivo recibido"]
+      }
+    },
+    {
+      "id": "identity-correction-invalidates-lookups",
+      "title": "Correccion de correo y AUTH ID invalida todas las consultas",
+      "customer": {
+        "email": "cliente.anterior@example.test",
+        "authId": "99000006"
+      },
+      "messages": [
+        {
+          "role": "customer",
+          "text": "Mi retiro de $750 solicitado hoy aparece en revision."
+        }
+      ],
+      "corrections": [
+        {
+          "field": "email",
+          "text": "Me equivoque de correo, el correcto es cliente.corregido@example.test",
+          "expectedValue": "cliente.corregido@example.test"
+        },
+        {
+          "field": "authId",
+          "text": "Tambien me equivoque de ID, el correcto es 99000999",
+          "expectedValue": "99000999"
+        }
+      ],
+      "expected": {
+        "workflow": "withdrawal",
+        "invalidatedSystemFacts": [
+          "caseJiraLookup",
+          "caseSlackLookup",
+          "caseKycReview",
+          "caseAtenaLookup"
+        ],
+        "identityCorrectionCount": 2
+      }
+    }
+  ]
+}

@@ -1,11 +1,37 @@
 import { readFileSync } from "node:fs";
-import { createJiraIssue } from "../lib/jira.js";
-import { sendSlackSupportNotification } from "../lib/slack.js";
+import {
+  addJiraIssueComment,
+  createJiraIssue,
+  findJiraIssueComment,
+  searchJiraTickets,
+  verifyJiraIssueComment
+} from "../lib/jira.js";
+import {
+  findSlackApprovedMessage,
+  lookupSlackListCache,
+  sendSlackApprovedMessage,
+  sendSlackRouteMessage,
+  sendSlackSupportNotification,
+  verifySlackApprovedMessage
+} from "../lib/slack.js";
 import { optionalEnv, readJson, sendJson, requireWidgetAccess } from "../lib/http.js";
-import { writeAuditLog } from "../lib/audit.js";
+import { summarizeSupportTicketForAudit, writeAuditLog } from "../lib/audit.js";
 import { requireCurrentAccount } from "../lib/account-store.js";
 import { getSupportConfig, isSupportAdmin } from "../lib/remote-config.js";
+import { getAgentToolAccess, requireAgentCapability } from "../lib/tool-access.js";
+import { getAiRuntimeState } from "../lib/ai-runtime-toggle.js";
 import { addAiExample, addAiFeedback, inferTopic, selectRelevantAiExamples } from "../lib/ai-training.js";
+import {
+  AI_PROVIDER_GROQ,
+  buildGroqChatCompletionBody,
+  extractAiResponseText,
+  isProviderQuotaExceeded,
+  isProviderRateLimit,
+  isProviderUnsupportedJsonMode,
+  redactExternalAiText,
+  requestGroqChatCompletion,
+  resolveAiProvider
+} from "../lib/ai-provider.js";
 import {
   claimLiveChatWelcome,
   extractLiveChatCustomerMessages,
@@ -13,13 +39,55 @@ import {
   getLiveChat,
   getLiveChatSafeTemplateRecord,
   getLiveChatWelcomeRecord,
+  findLiveChatMessage,
   listActiveLiveChats,
   releaseLiveChatWelcome,
   saveLiveChatSafeTemplateRecord,
   saveLiveChatWelcomeRecord,
-  sendLiveChatMessage
+  sendLiveChatMessage,
+  verifyLiveChatMessage
 } from "../lib/livechat.js";
 import { findSafeAutoTemplateReply, isSimpleGreeting } from "../lib/safe-template-replies.js";
+import { validateSupportAttachments } from "../lib/attachment-policy.js";
+import {
+  buildIneReceivedParentMessage,
+  buildRetirosKycMessage,
+  normalizeIneReceivedEmail
+} from "../lib/ine-received.js";
+import { createCaseReadTools } from "../lib/case-read-tools.js";
+import { createAtenaJob, getJob as getAtenaJob } from "../lib/atena-bridge-store.js";
+import { createBobJob } from "../lib/bob-bridge-store.js";
+import { registerAutomaticBobClosure } from "../lib/case-bob-auto-response.js";
+import { processCaseAcknowledgement, processVerifiedCaseDecision } from "../lib/case-evidence-auto-response.js";
+import { createKycJob, getKycJob } from "../lib/kyc-bridge-store.js";
+import { getSupportCase, updateSupportCase } from "../lib/case-store.js";
+import { generateCaseDraft } from "../lib/case-draft.js";
+import { appendVerifiedCaseAction } from "../lib/case-verified-actions.js";
+import { createKycReviewStore } from "../lib/kyc-review-store.js";
+import { evaluateCaseActionContext } from "../lib/case-action-context.js";
+import {
+  evolveSupportCase,
+  orchestrateLiveChatCase,
+  publicCaseSummary,
+  reviewCaseEvidence
+} from "../lib/case-orchestrator.js";
+import {
+  approveCaseAction,
+  createCaseActionProposal,
+  publicCaseToolResult
+} from "../lib/case-operation-contracts.js";
+import { createCaseActionStore } from "../lib/case-action-store.js";
+import {
+  executeCaseAction,
+  reconcileCaseActionExecution,
+  verifyCaseActionExecution
+} from "../lib/case-action-executor.js";
+import {
+  getSupportAgentMode,
+  requireApprovedActionsEnabled,
+  requireLegacyAutoSafeSendsEnabled,
+  requireSupportAgentEnabled
+} from "../lib/integration-policy.js";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.4-mini";
 const DEFAULT_OPENAI_FALLBACK_MODEL = "gpt-5.4-nano";
@@ -29,6 +97,10 @@ const INTENTS_DATASET_PATH = new URL("../docs/betxico_intents_dataset_v1.json", 
 const FALLBACK_TEMPLATES_PATH = new URL("../docs/betxico_fallback_templates_v1.json", import.meta.url);
 let intentsDatasetCache = null;
 let fallbackTemplatesCache = null;
+const caseActionStore = createCaseActionStore();
+const kycReviewStore = createKycReviewStore();
+
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -72,6 +144,42 @@ export default async function handler(req, res) {
     if (action === "game-sessions-requests") {
       return await handleGameSessionsRequestsList(req, res, payload);
     }
+    if (action === "ine-received") {
+      return await handleIneReceived(req, res, payload);
+    }
+    if (action === "case-get") {
+      return await handleCaseGet(req, res, payload);
+    }
+    if (action === "case-refresh") {
+      return await handleCaseRefresh(req, res, payload);
+    }
+    if (action === "case-evidence-status") {
+      return await handleCaseEvidenceStatus(req, res, payload);
+    }
+    if (action === "case-evidence-review") {
+      return await handleCaseEvidenceReview(req, res, payload);
+    }
+    if (action === "case-draft") {
+      return await handleCaseDraft(req, res, payload);
+    }
+    if (action === "case-action-propose") {
+      return await handleCaseActionPropose(req, res, payload);
+    }
+    if (action === "case-action-approve") {
+      return await handleCaseActionApprove(req, res, payload);
+    }
+    if (action === "case-action-reject") {
+      return await handleCaseActionReject(req, res, payload);
+    }
+    if (action === "case-action-execute") {
+      return await handleCaseActionExecute(req, res, payload);
+    }
+    if (action === "case-action-verify") {
+      return await handleCaseActionVerify(req, res, payload);
+    }
+    if (action === "case-action-reconcile") {
+      return await handleCaseActionReconcile(req, res, payload);
+    }
 
     const normalized = normalizeSupportPayload(payload);
     const account = await requireCurrentAccount(req);
@@ -113,9 +221,7 @@ export default async function handler(req, res) {
     await writeAuditLog({
       type: "support_ticket_created",
       status: "ok",
-      payload: normalized,
-      jira,
-      slack
+      operation: summarizeSupportTicketForAudit(normalized, { jira, slack, account })
     });
 
     return sendJson(res, 200, { ok: true, jira, slack });
@@ -146,8 +252,722 @@ function buildSlackAccountIdentity(account = {}) {
   };
 }
 
+async function handleIneReceived(req, res, payload) {
+  const account = await requireCurrentAccount(req);
+  const email = normalizeIneReceivedEmail(payload?.customer?.email || payload?.email);
+  const attachments = validateSupportAttachments(payload?.attachments || []);
+  if (!attachments.length) {
+    const error = new Error("ine_received_evidence_required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const accountSettings = buildSlackAccountIdentity(account);
+  const ine = await sendSlackRouteMessage({
+    routeId: "ine-recibida",
+    text: buildIneReceivedParentMessage(email),
+    attachments,
+    initialComment: "INE recibida del cliente",
+    accountSettings
+  });
+
+  let withdrawal = null;
+  let withdrawalError = "";
+  if (payload?.withdrawal?.notify === true) {
+    const withdrawalText = buildRetirosKycMessage({
+      email,
+      withdrawalDate: payload.withdrawal.date,
+      withdrawalAmount: payload.withdrawal.amount
+    });
+    try {
+      withdrawal = await sendSlackRouteMessage({
+        routeId: "retiros-kyc",
+        text: withdrawalText,
+        accountSettings
+      });
+    } catch (error) {
+      withdrawalError = error.message || "retiros_kyc_notification_failed";
+    }
+  }
+
+  await writeAuditLog({
+    type: "ine_received_sent",
+    status: withdrawalError ? "partial" : "ok",
+    operation: {
+      source: "ine_received",
+      attachmentCount: attachments.length,
+      ineRoute: ine.routeId,
+      withdrawalRequested: payload?.withdrawal?.notify === true,
+      withdrawalRoute: withdrawal?.routeId || "",
+      withdrawalError
+    }
+  });
+
+  return sendJson(res, 200, {
+    ok: true,
+    ine: { routeId: ine.routeId, files: ine.files.length },
+    withdrawal: payload?.withdrawal?.notify === true
+      ? { ok: !withdrawalError, routeId: withdrawal?.routeId || "", error: withdrawalError || null }
+      : null,
+    partial: Boolean(withdrawalError)
+  });
+}
+
+async function handleCaseGet(req, res, payload) {
+  requireSupportAgentEnabled();
+  await requireCurrentAccount(req);
+  const chatId = cleanCaseIdentifier(payload.chatId);
+  const caseRecord = chatId ? await getSupportCase(chatId) : null;
+  if (!caseRecord) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+
+  const actionRecord = payload.proposalId
+    ? await caseActionStore.get(String(payload.proposalId || "").trim())
+    : await caseActionStore.getLatestByChat(chatId);
+  return sendJson(res, 200, {
+    ok: true,
+    case: operationalCaseView(caseRecord),
+    action: actionRecord
+  });
+}
+
+async function handleCaseRefresh(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  const toolAccess = await getAgentToolAccess(account.email);
+  const chatId = cleanCaseIdentifier(payload.chatId);
+  let existing = chatId ? await getSupportCase(chatId) : null;
+  let hydratedFromLiveChat = false;
+  let hydratedFromWidgetContext = false;
+
+  // The widget can be opened on a chat that predates the webhook, or when the
+  // webhook was unavailable. In that case, hydrate the case from LiveChat's
+  // authenticated read API before consulting Jira, Slack, Atena, or KYC.
+  if (!existing && chatId) {
+    try {
+      const liveChatResponse = await getLiveChat(chatId);
+      const chat = liveChatResponse?.chat || liveChatResponse;
+      existing = await orchestrateLiveChatCase({
+        action: "on_demand_case_refresh",
+        payload: { chat }
+      }, { chatId });
+      hydratedFromLiveChat = Boolean(existing);
+    } catch (error) {
+      await writeAuditLog({
+        type: "support_case_livechat_hydration_failed",
+        status: "error",
+        chatId,
+        error: error.message || "livechat_case_hydration_failed"
+      }).catch(() => null);
+    }
+  }
+
+  // LiveChat can still render the widget with customer fields even when its
+  // server-side chat-read credential is unavailable. The context is supplied
+  // by the active widget only and contains no fabricated conversation events.
+  if (!existing && chatId) {
+    const widgetCustomer = normalizeWidgetCustomer(payload.customer);
+    if (widgetCustomer.email || widgetCustomer.authId || widgetCustomer.name) {
+      existing = await orchestrateLiveChatCase({
+        action: "widget_context_refresh",
+        payload: {
+          chat: {
+            id: chatId,
+            properties: widgetCustomer.authId ? { auth_id: widgetCustomer.authId } : {},
+            users: [{
+              id: widgetCustomer.liveChatCustomerId || "widget-customer",
+              type: "customer",
+              email: widgetCustomer.email,
+              name: widgetCustomer.name
+            }]
+          }
+        }
+      }, { chatId });
+      hydratedFromWidgetContext = Boolean(existing);
+    }
+  }
+  if (!existing) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+  const activeAction = await caseActionStore.getLatestByChat(chatId);
+  if (["proposed", "approved", "executing", "verification_pending"].includes(activeAction?.status)) {
+    return sendJson(res, 200, {
+      ok: true,
+      case: operationalCaseView(existing),
+      action: activeAction,
+      refreshSkipped: "active_case_action"
+    });
+  }
+
+  const query = caseLookupIdentity(existing);
+  const tools = createCaseReadTools({
+    jiraSearch: (value) => searchJiraTickets(value, account),
+    cacheLookup: lookupSlackListCache,
+    kycLookup: (email) => kycReviewStore.findLatestByEmail(email),
+    createAtenaJob,
+    getAtenaJob,
+    createKycJob,
+    getKycJob
+  });
+  const results = await tools.lookupHistory(query);
+  // Atena y KYC de Paybridge se consultan exclusivamente al pulsar sus
+  // botones. El refresh del chat sólo actualiza Jira, Lista 8 y conserva la
+  // evidencia ya obtenida para que otro agente pueda reutilizarla.
+  const atena = existing.systemFacts?.caseAtenaLookup || null;
+  const kyc = existing.systemFacts?.caseKycLookup || null;
+  const kycReview = toolAccess.capabilities.kyc === true
+    ? await tools.lookupKycReview(query)
+    : existing.systemFacts?.caseKycReview || null;
+  const updated = await updateSupportCase(chatId, (current) => evolveSupportCase(current || existing, {
+    chatId,
+    customer: (current || existing).customer,
+    events: [],
+    systemFacts: {
+      caseJiraLookup: results.jira,
+      caseSlackLookup: results.slack,
+      caseAtenaLookup: atena,
+      caseKycLookup: kyc,
+      caseKycReview: kycReview
+    },
+    now: new Date().toISOString()
+  }));
+
+  const bobClosure = toolAccess.capabilities.bob === true && updated.workflow?.id === "game_access"
+    ? await registerAutomaticBobClosure(updated, { ownerEmail: account.email, createBobJob }).catch(async (error) => {
+        await writeAuditLog({
+          type: "support_case_bob_auto_closure_failed",
+          status: "error",
+          chatId,
+          source: "bob",
+          error: error.message || "bob_auto_closure_failed"
+        }).catch(() => null);
+        return null;
+      })
+    : null;
+  const acknowledgement = await processCaseAcknowledgement(updated).catch(() => null);
+  const responseAutomation = await processVerifiedCaseDecision(updated).catch(async (error) => {
+    await writeAuditLog({
+      type: "support_case_decision_auto_response_failed",
+      status: "error",
+      chatId,
+      source: updated.operationalDecision?.source || "case_evidence",
+      route: updated.operationalDecision?.route || "",
+      error: error.message || "case_decision_auto_response_failed"
+    }).catch(() => null);
+    return null;
+  });
+
+  await writeAuditLog({
+    type: "support_case_tools_refreshed",
+    status: "ok",
+    chatId,
+    jiraStatus: results.jira.status,
+    slackStatus: results.slack.status,
+    atenaStatus: atena?.status || "skipped",
+    kycStatus: kyc?.status || "skipped",
+    kycReviewStatus: kycReview?.status || "skipped",
+    bobStatus: bobClosure?.status || "skipped",
+    responseAutomation: responseAutomation?.state || acknowledgement?.state || "skipped"
+  });
+  return sendJson(res, 200, {
+    ok: true,
+    case: operationalCaseView(updated),
+    action: await caseActionStore.getLatestByChat(chatId),
+    hydratedFromLiveChat,
+    hydratedFromWidgetContext
+  });
+}
+
+function normalizeWidgetCustomer(value = {}) {
+  const email = String(value?.email || "").trim().toLowerCase();
+  const name = String(value?.name || "").trim().slice(0, 180);
+  const authId = String(value?.authId || "").trim().replace(/[^0-9]/gu, "").slice(0, 32);
+  const liveChatCustomerId = String(value?.liveChatCustomerId || "").trim().slice(0, 180);
+  return {
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email) ? email : "",
+    name,
+    authId,
+    liveChatCustomerId
+  };
+}
+
+async function handleCaseEvidenceStatus(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  const chatId = cleanCaseIdentifier(payload.chatId);
+  const existing = chatId ? await getSupportCase(chatId) : null;
+  if (!existing) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+
+  const query = caseLookupIdentity(existing);
+  const evidenceInput = {
+    ...query,
+    ownerEmail: account.email,
+    caseId: chatId
+  };
+  const tools = createCaseReadTools({
+    createAtenaJob,
+    getAtenaJob,
+    createKycJob,
+    getKycJob
+  });
+  const [atena, kyc] = await Promise.all([
+    isPendingBridgeEvidence(existing.systemFacts?.caseAtenaLookup)
+      ? tools.lookupAtena({
+          ...evidenceInput,
+          previousEvidence: existing.systemFacts.caseAtenaLookup
+        })
+      : existing.systemFacts?.caseAtenaLookup || null,
+    isPendingBridgeEvidence(existing.systemFacts?.caseKycLookup)
+      ? tools.lookupKyc({
+          ...evidenceInput,
+          previousEvidence: existing.systemFacts.caseKycLookup
+        })
+      : existing.systemFacts?.caseKycLookup || null
+  ]);
+  const updated = await updateSupportCase(chatId, (current) => evolveSupportCase(current || existing, {
+    chatId,
+    customer: (current || existing).customer,
+    events: [],
+    systemFacts: {
+      caseAtenaLookup: atena,
+      caseKycLookup: kyc
+    },
+    source: (current || existing).source,
+    now: new Date().toISOString()
+  }));
+  return sendJson(res, 200, {
+    ok: true,
+    case: operationalCaseView(updated),
+    evidencePending: hasPendingBridgeEvidence(atena, kyc)
+  });
+}
+
+function hasPendingBridgeEvidence(...values) {
+  return values.some(isPendingBridgeEvidence);
+}
+
+function isPendingBridgeEvidence(value) {
+  return value?.status === "unavailable"
+    && value?.error?.retryable === true
+    && /_lookup_pending$/u.test(String(value?.error?.code || ""));
+}
+
+async function handleCaseEvidenceReview(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  const chatId = cleanCaseIdentifier(payload.chatId);
+  const attachmentIds = Array.isArray(payload.attachmentIds) ? payload.attachmentIds : [];
+  const existing = chatId ? await getSupportCase(chatId) : null;
+  if (!existing) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+
+  const updated = await updateSupportCase(chatId, (current) => reviewCaseEvidence(current || existing, {
+    attachmentIds,
+    reviewedBy: account.email,
+    now: new Date().toISOString()
+  }));
+  await writeAuditLog({
+    type: "support_case_evidence_reviewed",
+    status: "ok",
+    chatId,
+    attachmentCount: attachmentIds.length,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, { ok: true, case: operationalCaseView(updated) });
+}
+
+async function handleCaseDraft(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  await requireAgentCapability(account, "ai");
+  const chatId = cleanCaseIdentifier(payload.chatId);
+  const caseRecord = chatId ? await getSupportCase(chatId) : null;
+  if (!caseRecord) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+  const activeAction = await caseActionStore.getLatestByChat(chatId);
+  if (["proposed", "approved", "executing", "verification_pending"].includes(activeAction?.status)) {
+    return sendJson(res, 409, { ok: false, error: "case_action_already_active", action: activeAction });
+  }
+
+  const generated = await generateCaseDraft({ caseRecord });
+  await writeAuditLog({
+    type: "support_case_draft_generated",
+    status: "ok",
+    chatId,
+    provider: generated.provider,
+    model: generated.model,
+    sourceStatus: generated.sourceStatus,
+    suggestedActionType: generated.draft?.suggestedAction?.actionType || "",
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, { ok: true, ...generated });
+}
+
+async function handleCaseActionPropose(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  const chatId = cleanCaseIdentifier(payload.chatId);
+  const caseRecord = chatId ? await getSupportCase(chatId) : null;
+  if (!caseRecord) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+
+  const actionType = String(payload.actionType || "").trim().toLowerCase();
+  const actionPayload = normalizeCaseActionPayload(actionType, payload.payload, caseRecord);
+  assertCaseActionContext(caseRecord, actionType, actionPayload);
+  const proposal = createCaseActionProposal({
+    caseRecord,
+    actionType,
+    payload: actionPayload,
+    proposedBy: { type: "human", email: account.email },
+    reason: String(payload.reason || "Accion solicitada por el agente.").trim().slice(0, 500)
+  });
+  const record = await caseActionStore.propose(proposal);
+  await writeAuditLog({
+    type: "support_case_action_proposed",
+    status: "proposed",
+    chatId,
+    proposalId: proposal.proposalId,
+    actionType,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, { ok: true, action: record });
+}
+
+async function handleCaseActionApprove(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  const proposalId = String(payload.proposalId || "").trim();
+  const record = proposalId ? await caseActionStore.get(proposalId) : null;
+  if (!record) return sendJson(res, 404, { ok: false, error: "case_action_not_found" });
+  const role = await isSupportAdmin(account.email) ? "admin" : "agent";
+  const approval = approveCaseAction(record.proposal, { email: account.email, role });
+  const approved = await caseActionStore.approve(proposalId, approval);
+  await writeAuditLog({
+    type: "support_case_action_approved",
+    status: "approved",
+    chatId: record.proposal.chatId,
+    proposalId,
+    approvalId: approved.approval?.approvalId || "",
+    actionType: record.proposal.actionType,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, { ok: true, action: approved });
+}
+
+async function handleCaseActionReject(req, res, payload) {
+  requireSupportAgentEnabled();
+  const account = await requireCurrentAccount(req);
+  const proposalId = String(payload.proposalId || "").trim();
+  const rejected = await caseActionStore.reject(proposalId, {
+    rejectedBy: { email: account.email },
+    reason: String(payload.reason || "Rechazada por el agente.").trim().slice(0, 500)
+  });
+  await writeAuditLog({
+    type: "support_case_action_rejected",
+    status: "rejected",
+    chatId: rejected.proposal.chatId,
+    proposalId,
+    actionType: rejected.proposal.actionType,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, { ok: true, action: rejected });
+}
+
+async function handleCaseActionExecute(req, res, payload) {
+  requireApprovedActionsEnabled();
+  const account = await requireCurrentAccount(req);
+  const proposalId = String(payload.proposalId || "").trim();
+  const record = proposalId ? await caseActionStore.get(proposalId) : null;
+  if (!record) return sendJson(res, 404, { ok: false, error: "case_action_not_found" });
+  const caseRecord = await getSupportCase(record.proposal.chatId);
+  if (!caseRecord) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+
+  const claimed = await caseActionStore.claimExecution(proposalId, {
+    idempotencyKey: record.idempotencyKey,
+    executingBy: { email: account.email }
+  });
+  const result = await executeCaseAction({
+    proposal: claimed.proposal,
+    approval: claimed.approval,
+    caseRecord,
+    dependencies: buildCaseActionDependencies(account)
+  });
+  const completionStatus = result.status === "verified"
+    ? "verified"
+    : result.status === "verification_pending"
+      ? "verification_pending"
+      : "failed";
+  const completed = await caseActionStore.completeExecution(proposalId, {
+    status: completionStatus,
+    idempotencyKey: claimed.idempotencyKey,
+    result: {
+      verified: result.verified === true,
+      reason: result.reason,
+      actionType: result.actionType,
+      verificationRef: result.verificationRef
+    },
+    error: completionStatus === "failed" ? { code: result.reason || "case_action_failed" } : null
+  });
+  const updatedCase = result.verified === true
+    ? await persistVerifiedCaseAction(record.proposal.chatId, result)
+    : null;
+  await writeAuditLog({
+    type: "support_case_action_completed",
+    status: completionStatus,
+    chatId: record.proposal.chatId,
+    proposalId,
+    actionType: record.proposal.actionType,
+    verified: result.verified === true,
+    reason: result.reason,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, {
+    ok: true,
+    result,
+    action: completed,
+    case: updatedCase ? operationalCaseView(updatedCase) : undefined
+  });
+}
+
+async function handleCaseActionVerify(req, res, payload) {
+  requireApprovedActionsEnabled();
+  const account = await requireCurrentAccount(req);
+  const proposalId = String(payload.proposalId || "").trim();
+  const record = proposalId ? await caseActionStore.get(proposalId) : null;
+  if (!record) return sendJson(res, 404, { ok: false, error: "case_action_not_found" });
+
+  const result = await verifyCaseActionExecution({
+    actionRecord: record,
+    dependencies: buildCaseActionDependencies(account)
+  });
+  const completionStatus = result.verified === true ? "verified" : "verification_pending";
+  const completed = await caseActionStore.completeExecution(proposalId, {
+    status: completionStatus,
+    idempotencyKey: record.idempotencyKey,
+    result: {
+      verified: result.verified === true,
+      reason: result.reason,
+      actionType: result.actionType,
+      verificationRef: result.verificationRef
+    }
+  });
+  const updatedCase = result.verified === true
+    ? await persistVerifiedCaseAction(record.proposal.chatId, result)
+    : null;
+  await writeAuditLog({
+    type: "support_case_action_reverified",
+    status: completionStatus,
+    chatId: record.proposal.chatId,
+    proposalId,
+    actionType: record.proposal.actionType,
+    verified: result.verified === true,
+    reason: result.reason,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, {
+    ok: true,
+    result,
+    action: completed,
+    case: updatedCase ? operationalCaseView(updatedCase) : undefined
+  });
+}
+
+async function handleCaseActionReconcile(req, res, payload) {
+  requireApprovedActionsEnabled();
+  const account = await requireCurrentAccount(req);
+  const proposalId = String(payload.proposalId || "").trim();
+  const record = proposalId ? await caseActionStore.get(proposalId) : null;
+  if (!record) return sendJson(res, 404, { ok: false, error: "case_action_not_found" });
+
+  const result = await reconcileCaseActionExecution({
+    actionRecord: record,
+    dependencies: buildCaseActionDependencies(account)
+  });
+  const completionStatus = result.verified === true ? "verified" : "verification_pending";
+  const completed = await caseActionStore.completeExecution(proposalId, {
+    status: completionStatus,
+    idempotencyKey: record.idempotencyKey,
+    result: {
+      verified: result.verified === true,
+      reason: result.reason,
+      actionType: result.actionType,
+      verificationRef: result.verificationRef
+    }
+  });
+  const updatedCase = result.verified === true
+    ? await persistVerifiedCaseAction(record.proposal.chatId, result)
+    : null;
+  await writeAuditLog({
+    type: "support_case_action_reconciled",
+    status: completionStatus,
+    chatId: record.proposal.chatId,
+    proposalId,
+    actionType: record.proposal.actionType,
+    verified: result.verified === true,
+    reason: result.reason,
+    account: { email: account.email }
+  });
+  return sendJson(res, 200, {
+    ok: true,
+    result,
+    action: completed,
+    case: updatedCase ? operationalCaseView(updatedCase) : undefined
+  });
+}
+
+async function persistVerifiedCaseAction(chatId, result) {
+  const verifiedAt = new Date().toISOString();
+  return updateSupportCase(chatId, (current) => {
+    if (!current) {
+      const error = new Error("support_case_not_found");
+      error.statusCode = 404;
+      throw error;
+    }
+    return evolveSupportCase(current, {
+      chatId,
+      customer: current.customer,
+      events: [],
+      systemFacts: appendVerifiedCaseAction(current.systemFacts, result, { now: verifiedAt }),
+      now: verifiedAt
+    });
+  });
+}
+
+function buildCaseActionDependencies(account) {
+  return {
+    "jira.comment": {
+      execute: ({ payload }) => addJiraIssueComment(payload.issueKey, payload.body, account),
+      verify: ({ payload, execution }) => verifyJiraIssueComment(
+        payload.issueKey,
+        execution?.id,
+        payload.body,
+        account
+      ),
+      reconcile: ({ payload, startedAt }) => findJiraIssueComment({
+        issueKey: payload.issueKey,
+        body: payload.body,
+        since: startedAt,
+        accountSettings: account
+      })
+    },
+    "slack.notify": {
+      execute: ({ payload }) => sendSlackApprovedMessage({
+        routeId: payload.routeId,
+        text: payload.text,
+        accountSettings: account
+      }),
+      verify: ({ payload, execution }) => verifySlackApprovedMessage({
+        routeId: payload.routeId,
+        channel: execution?.channel,
+        ts: execution?.ts,
+        text: payload.text,
+        accountSettings: account
+      }),
+      reconcile: ({ payload, startedAt }) => findSlackApprovedMessage({
+        routeId: payload.routeId,
+        text: payload.text,
+        since: startedAt,
+        accountSettings: account
+      })
+    },
+    "livechat.send_message": {
+      execute: ({ payload }) => sendLiveChatMessage({ chatId: payload.chatId, text: payload.text, visibility: "all" }),
+      verify: ({ payload, execution }) => verifyLiveChatMessage({
+        chatId: payload.chatId,
+        eventId: execution?.event_id,
+        text: payload.text,
+        visibility: "all"
+      }),
+      reconcile: ({ payload, startedAt }) => findLiveChatMessage({
+        chatId: payload.chatId,
+        text: payload.text,
+        visibility: "all",
+        since: startedAt
+      })
+    }
+  };
+}
+
+function normalizeCaseActionPayload(actionType, rawPayload = {}, caseRecord = {}) {
+  if (actionType === "jira.comment") {
+    const issueKey = String(rawPayload.issueKey || "").trim().toUpperCase();
+    const body = cleanActionText(rawPayload.body, 2000);
+    if (!/^[A-Z][A-Z0-9]{1,19}-\d{1,12}$/.test(issueKey) || !body) throwActionPayloadError();
+    return { issueKey, body };
+  }
+  if (actionType === "slack.notify") {
+    const routeId = String(rawPayload.routeId || "").trim().slice(0, 100);
+    const text = cleanActionText(rawPayload.text, 3000);
+    if (!/^[A-Za-z0-9_.-]+$/.test(routeId) || !text) throwActionPayloadError();
+    return { routeId, text };
+  }
+  if (actionType === "livechat.send_message") {
+    const text = cleanActionText(rawPayload.text, 3000);
+    if (!text) throwActionPayloadError();
+    return { chatId: caseRecord.chatId, text };
+  }
+  return rawPayload;
+}
+
+function assertCaseActionContext(caseRecord, actionType, actionPayload) {
+  const result = evaluateCaseActionContext(caseRecord, actionType, actionPayload);
+  if (!result.ok) throwCaseActionContextError(result.reason);
+}
+
+function throwCaseActionContextError(message) {
+  const error = new Error(message);
+  error.statusCode = 409;
+  throw error;
+}
+
+function throwActionPayloadError() {
+  const error = new Error("invalid_case_action_payload");
+  error.statusCode = 400;
+  throw error;
+}
+
+function cleanActionText(value, maxLength) {
+  return String(value || "").replace(/\u0000/g, "").trim().slice(0, maxLength);
+}
+
+function cleanCaseIdentifier(value) {
+  return String(value || "").trim().slice(0, 180);
+}
+
+function caseLookupIdentity(caseRecord = {}) {
+  const identity = {};
+  const ticketKey = String(caseRecord.facts?.ticketKey || "").trim();
+  if (ticketKey) identity.ticketKey = ticketKey;
+  const email = String(caseRecord.customer?.email || "").trim();
+  if (email) identity.email = email;
+  const authId = String(caseRecord.customer?.authId || caseRecord.customer?.liveChatCustomerId || "").trim();
+  if (authId) identity.authId = authId;
+  return identity;
+}
+
+function operationalCaseView(caseRecord) {
+  return {
+    ...publicCaseSummary(caseRecord),
+    agentMode: getSupportAgentMode(),
+    systemFacts: {
+      jira: publicCaseToolResult(caseRecord.systemFacts?.caseJiraLookup),
+      slack: publicCaseToolResult(caseRecord.systemFacts?.caseSlackLookup),
+      atena: publicCaseToolResult(caseRecord.systemFacts?.caseAtenaLookup),
+      kyc: publicCaseToolResult(caseRecord.systemFacts?.caseKycLookup),
+      kycReview: publicCaseToolResult(caseRecord.systemFacts?.caseKycReview)
+    },
+    evidenceItems: Array.isArray(caseRecord.evidence?.attachments)
+      ? caseRecord.evidence.attachments.map((attachment) => ({
+        id: attachment.id,
+        kind: attachment.kind,
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+        receivedAt: attachment.receivedAt,
+        reviewStatus: attachment.reviewStatus,
+        reviewedAt: attachment.reviewedAt || ""
+      }))
+      : []
+  };
+}
+
 async function handleGameSessionsRequest(req, res, payload) {
   const account = await requireCurrentAccount(req);
+  await requireAgentCapability(account, "bob");
   const customerId = cleanCustomerId(payload.customerId || payload.authId || payload.customer_id);
   if (!customerId) {
     return sendJson(res, 400, { ok: false, error: "invalid_customer_id" });
@@ -165,27 +985,21 @@ async function handleGameSessionsRequest(req, res, payload) {
   };
 
   try {
-    const data = await requestGameSessionsClosureViaBetxicoAssistant({
-      customerId,
-      reason: cleanText(payload.reason || payload.note || payload.message).slice(0, 260),
-      customerName: cleanText(payload.customerName).slice(0, 160),
-      customerEmail: cleanText(payload.customerEmail).slice(0, 180),
-      account,
-      chatId: auditBase.chatId
-    });
+    const { createBobJob } = await import("../lib/bob-bridge-store.js");
+    const request = await createBobJob({ ownerEmail: account.email, customerId, chatId: auditBase.chatId });
 
     await writeAuditLog({
       ...auditBase,
       status: "ok",
-      requestId: data.request?.id || "",
-      duplicate: Boolean(data.duplicate)
+      requestId: request.id,
+      transport: "bob_ui_playwright_bridge"
     });
 
     return sendJson(res, 200, {
       ok: true,
       customerId,
-      duplicate: Boolean(data.duplicate),
-      request: data.request
+      duplicate: false,
+      request
     });
   } catch (error) {
     await writeAuditLog({
@@ -204,23 +1018,14 @@ async function handleGameSessionsRequest(req, res, payload) {
 }
 
 async function handleGameSessionsRequestsList(req, res, payload) {
-  await requireCurrentAccount(req);
-  try {
-    const data = await listGameSessionsClosureRequestsViaBetxicoAssistant({
-      status: cleanText(payload.status || "all") || "all",
-      limit: Number(payload.limit || 20)
-    });
-    return sendJson(res, 200, {
-      ok: true,
-      requests: Array.isArray(data.requests) ? data.requests : []
-    });
-  } catch (error) {
-    return sendJson(res, error.statusCode || 500, {
-      ok: false,
-      error: error.message || "game_sessions_requests_failed",
-      details: error.details || undefined
-    });
-  }
+  const account = await requireCurrentAccount(req);
+  await requireAgentCapability(account, "bob");
+  const { getBobJob } = await import("../lib/bob-bridge-store.js");
+  const jobId = cleanText(payload.jobId);
+  if (!jobId) return sendJson(res, 400, { ok: false, error: "missing_bob_job_id" });
+  const job = await getBobJob(jobId);
+  if (!job || job.ownerEmail !== account.email) return sendJson(res, 404, { ok: false, error: "bob_job_not_found" });
+  return sendJson(res, 200, { ok: true, requests: [job] });
 }
 
 async function requestGameSessionsClosureViaBetxicoAssistant({ customerId, reason, customerName, customerEmail, account, chatId }) {
@@ -351,7 +1156,8 @@ function statusError(message, statusCode) {
 }
 
 async function handleAiChat(req, res, payload) {
-  const account = await requireAdminAccount(req);
+  const account = await requireCurrentAccount(req);
+  await requireAgentCapability(account, "ai");
 
   const message = cleanText(payload.message).slice(0, MAX_AI_MESSAGE_LENGTH);
   const context = cleanText(payload.context).slice(0, MAX_AI_CONTEXT_LENGTH);
@@ -362,7 +1168,8 @@ async function handleAiChat(req, res, payload) {
 
   const config = await getSupportConfig().catch(() => ({}));
   const aiConfig = config.aiAssistant || {};
-  if (aiConfig.enabled === false) {
+  const aiRuntime = await getAiRuntimeState();
+  if (aiConfig.enabled === false || aiRuntime.enabled !== true) {
     return sendJson(res, 403, { ok: false, error: "ai_assistant_disabled" });
   }
 
@@ -399,19 +1206,51 @@ async function handleAiChat(req, res, payload) {
     });
   }
 
-  const apiKey = optionalEnv("OPENAI_API_KEY");
-  if (!apiKey) {
-    return sendJson(res, 500, { ok: false, error: "missing_openai_api_key" });
-  }
-
+  const aiProvider = resolveAiProvider();
   const examples = await selectRelevantAiExamples({
     message,
     context,
     topic,
     limit: Math.min(Number(aiConfig.maxExamples || 3) || 3, 3)
   }).catch(() => []);
+
+  if (aiProvider.provider === AI_PROVIDER_GROQ) {
+    return await handleGroqAiChat({
+      res,
+      account,
+      aiProvider,
+      aiConfig,
+      message,
+      context,
+      topic,
+      intentsDataset,
+      intentCandidates,
+      examples
+    });
+  }
+
+  const apiKey = optionalEnv("OPENAI_API_KEY");
+  if (!apiKey) {
+    return sendJson(res, 500, { ok: false, error: "missing_openai_api_key", provider: aiProvider.provider });
+  }
+
+  const safeMessage = redactExternalAiText(message);
+  const safeContext = redactExternalAiText(context);
+  const safeExamples = redactExternalAiExamples(examples);
+  const redactionApplied = safeMessage !== message
+    || safeContext !== context
+    || JSON.stringify(safeExamples) !== JSON.stringify(examples);
   const model = optionalEnv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL);
-  const requestBody = buildOpenAiRequestBody({ model, account, aiConfig, message, context, examples, intentsDataset, intentCandidates });
+  const requestBody = buildOpenAiRequestBody({
+    model,
+    account,
+    aiConfig,
+    message: safeMessage,
+    context: safeContext,
+    examples: safeExamples,
+    intentsDataset,
+    intentCandidates
+  });
   let data = await requestOpenAi(apiKey, requestBody);
   let retriedWithoutFileSearch = false;
   let retriedWithFallbackModel = false;
@@ -425,7 +1264,7 @@ async function handleAiChat(req, res, payload) {
       ...requestBody,
       model: finalModel,
       tools: undefined,
-      instructions: buildAiInstructions(account, aiConfig, examples.slice(0, 2), intentsDataset, intentCandidates.slice(0, 3), { compact: true }),
+      instructions: buildAiInstructions(account, aiConfig, safeExamples.slice(0, 2), intentsDataset, intentCandidates.slice(0, 3), { compact: true }),
       max_output_tokens: Math.min(Number(optionalEnv("OPENAI_MAX_OUTPUT_TOKENS", "650")) || 650, 650)
     });
   }
@@ -455,6 +1294,7 @@ async function handleAiChat(req, res, payload) {
       await writeAuditLog({
         type: "ai_chat_template_fallback",
         status: "ok",
+        provider: "openai",
         model: "template-fallback",
         topic,
         selectedIntent: templateFallback.classification?.selectedIntent || "",
@@ -470,6 +1310,7 @@ async function handleAiChat(req, res, payload) {
         answer: templateFallback.answer,
         classification: templateFallback.classification,
         model: "template-fallback",
+        provider: "openai",
         topic,
         exampleCount: examples.length,
         usedFileSearch: false,
@@ -483,11 +1324,13 @@ async function handleAiChat(req, res, payload) {
     await writeAuditLog({
       type: "ai_chat_failed",
       status: "error",
+      provider: "openai",
       model: finalModel,
       topic,
       usedFileSearch: Boolean(requestBody.tools?.length),
       retriedWithoutFileSearch,
       retriedWithFallbackModel,
+      redactionApplied,
       account: { email: account.email || "" },
       error: data.error?.message || data.error || "openai_request_failed"
     });
@@ -505,6 +1348,7 @@ async function handleAiChat(req, res, payload) {
   await writeAuditLog({
     type: "ai_chat_completed",
     status: "ok",
+    provider: "openai",
     model: finalModel,
     topic,
     selectedIntent: classification?.selectedIntent || "",
@@ -514,6 +1358,7 @@ async function handleAiChat(req, res, payload) {
     usedFileSearch: Boolean(requestBody.tools?.length),
     retriedWithoutFileSearch,
     retriedWithFallbackModel,
+    redactionApplied,
     exampleCount: examples.length,
     account: { email: account.email || "" },
     usage: data.body?.usage || undefined
@@ -524,11 +1369,160 @@ async function handleAiChat(req, res, payload) {
     answer,
     classification,
     model: finalModel,
+    provider: "openai",
     topic,
     exampleCount: examples.length,
     usedFileSearch: Boolean(requestBody.tools?.length),
     retriedWithoutFileSearch,
-    retriedWithFallbackModel
+    retriedWithFallbackModel,
+    redactionApplied
+  });
+}
+
+async function handleGroqAiChat({
+  res,
+  account,
+  aiProvider,
+  aiConfig,
+  message,
+  context,
+  topic,
+  intentsDataset,
+  intentCandidates,
+  examples
+}) {
+  if (!aiProvider.apiKey) {
+    return sendJson(res, 500, { ok: false, error: "missing_groq_api_key", provider: AI_PROVIDER_GROQ });
+  }
+
+  const safeMessage = redactExternalAiText(message);
+  const safeContext = redactExternalAiText(context);
+  const safeExamples = redactExternalAiExamples(examples);
+  const redactionApplied = safeMessage !== message
+    || safeContext !== context
+    || JSON.stringify(safeExamples) !== JSON.stringify(examples);
+  const requestBody = buildGroqChatCompletionBody({
+    model: aiProvider.model,
+    instructions: buildAiInstructions(account, aiConfig, safeExamples, intentsDataset, intentCandidates, { compact: true }),
+    input: buildAiInput(safeMessage, safeContext),
+    maxOutputTokens: Math.min(Number(aiProvider.maxOutputTokens || 650) || 650, 650),
+    jsonMode: aiProvider.jsonMode
+  });
+  let data = await requestGroqChatCompletion(aiProvider.apiKey, requestBody);
+  let retriedWithoutJsonMode = false;
+
+  if (!data.ok && isProviderUnsupportedJsonMode(data) && requestBody.response_format) {
+    retriedWithoutJsonMode = true;
+    data = await requestGroqChatCompletion(aiProvider.apiKey, {
+      ...requestBody,
+      response_format: undefined
+    });
+  }
+
+  if (!data.ok) {
+    const providerErrorCode = isProviderQuotaExceeded(data)
+      ? "groq_quota_exceeded"
+      : isProviderRateLimit(data)
+        ? "groq_rate_limited"
+        : "groq_request_failed";
+
+    if (providerErrorCode === "groq_quota_exceeded" || providerErrorCode === "groq_rate_limited") {
+      const templateFallback = buildTemplateFallbackResponse({
+        message,
+        context,
+        topic,
+        examples,
+        intentCandidates,
+        errorCode: providerErrorCode
+      });
+
+      await writeAuditLog({
+        type: "ai_chat_template_fallback",
+        status: "ok",
+        provider: AI_PROVIDER_GROQ,
+        model: "template-fallback",
+        topic,
+        selectedIntent: templateFallback.classification?.selectedIntent || "",
+        subdiagnostic: templateFallback.classification?.subdiagnostic || "",
+        confidence: templateFallback.classification?.confidence || null,
+        riskLevel: templateFallback.classification?.riskLevel || "",
+        providerErrorCode,
+        account: { email: account.email || "" }
+      });
+
+      return sendJson(res, 200, {
+        ok: true,
+        answer: templateFallback.answer,
+        classification: templateFallback.classification,
+        model: "template-fallback",
+        provider: AI_PROVIDER_GROQ,
+        topic,
+        exampleCount: examples.length,
+        usedFileSearch: false,
+        retriedWithoutFileSearch: false,
+        retriedWithFallbackModel: false,
+        retriedWithoutJsonMode,
+        templateFallback: true,
+        providerErrorCode
+      });
+    }
+
+    await writeAuditLog({
+      type: "ai_chat_failed",
+      status: "error",
+      provider: AI_PROVIDER_GROQ,
+      model: aiProvider.model,
+      topic,
+      usedFileSearch: false,
+      retriedWithoutJsonMode,
+      redactionApplied,
+      account: { email: account.email || "" },
+      error: data.error?.message || data.error || "groq_request_failed"
+    });
+
+    return sendJson(res, data.status || 500, {
+      ok: false,
+      error: providerErrorCode,
+      provider: AI_PROVIDER_GROQ,
+      details: data.error?.message || data.error || undefined
+    });
+  }
+
+  const rawAnswer = extractAiResponseText(data.body);
+  const classification = parseAiClassification(rawAnswer, intentsDataset);
+  const answer = classification?.response || rawAnswer;
+
+  await writeAuditLog({
+    type: "ai_chat_completed",
+    status: "ok",
+    provider: AI_PROVIDER_GROQ,
+    model: aiProvider.model,
+    topic,
+    selectedIntent: classification?.selectedIntent || "",
+    subdiagnostic: classification?.subdiagnostic || "",
+    confidence: classification?.confidence || null,
+    riskLevel: classification?.riskLevel || "",
+    usedFileSearch: false,
+    retriedWithoutJsonMode,
+    redactionApplied,
+    exampleCount: examples.length,
+    account: { email: account.email || "" },
+    usage: data.body?.usage || undefined
+  });
+
+  return sendJson(res, 200, {
+    ok: true,
+    answer,
+    classification,
+    model: aiProvider.model,
+    provider: AI_PROVIDER_GROQ,
+    topic,
+    exampleCount: examples.length,
+    usedFileSearch: false,
+    retriedWithoutFileSearch: false,
+    retriedWithFallbackModel: false,
+    retriedWithoutJsonMode,
+    redactionApplied
   });
 }
 
@@ -558,6 +1552,7 @@ async function handleAiFeedback(req, res, payload) {
 
 async function handleLiveChatSendWelcome(req, res, payload) {
   const account = await requireCurrentAccount(req);
+  requireLegacyAutoSafeSendsEnabled();
   const config = await getSupportConfig().catch(() => ({}));
   const automation = config.liveChatAutomation || {};
   const autoWelcome = automation.autoWelcome || {};
@@ -631,27 +1626,35 @@ async function handleLiveChatSendWelcome(req, res, payload) {
     if (oncePerChat) await releaseLiveChatWelcome(chatId).catch(() => null);
     throw error;
   }
+  const verified = await verifyLiveChatMessage({
+    chatId,
+    eventId: result.event_id,
+    text: message,
+    visibility: "all"
+  }).catch(() => false);
   const sentAt = new Date().toISOString();
   await saveLiveChatWelcomeRecord(chatId, {
     sentAt,
     eventId: result.event_id || "",
     accountEmail: account.email || "",
-    message
+    message,
+    verified
   }).catch(() => null);
 
   await writeAuditLog({
     type: "livechat_welcome_sent",
-    status: "ok",
+    status: verified ? "ok" : "verification_pending",
     chatId,
     eventId: result.event_id || "",
     account: { email: account.email || "" }
   });
 
-  return sendJson(res, 200, {
+  return sendJson(res, verified ? 200 : 202, {
     ok: true,
     chatId,
     eventId: result.event_id || "",
-    sentAt
+    sentAt,
+    verified
   });
 }
 
@@ -665,28 +1668,15 @@ function liveChatAlreadyHasMessage(chat, message) {
 }
 
 async function handleLiveChatSendMessage(req, res, payload) {
-  const account = await requireCurrentAccount(req);
-  const chatId = cleanText(payload.chatId || payload.chat_id);
-  const message = cleanText(payload.message);
-  if (!chatId) {
-    return sendJson(res, 400, { ok: false, error: "missing_chat_id" });
-  }
-  if (!message) {
-    return sendJson(res, 400, { ok: false, error: "missing_message" });
-  }
-
-  const result = await sendLiveChatMessage({ chatId, text: message });
-  await writeAuditLog({
-    type: "livechat_message_sent",
-    status: "ok",
-    chatId,
-    eventId: result.event_id || "",
-    account: { email: account.email || "" }
+  await requireCurrentAccount(req);
+  return sendJson(res, 409, {
+    ok: false,
+    error: "livechat_message_requires_case_approval"
   });
-  return sendJson(res, 200, { ok: true, chatId, eventId: result.event_id || "" });
 }
 
 async function handleLiveChatAutoSafeTemplate(req, res, payload) {
+  requireLegacyAutoSafeSendsEnabled();
   const account = await requireCurrentAccount(req);
   const config = await getSupportConfig().catch(() => ({}));
   const automation = config.liveChatAutomation || {};
@@ -741,18 +1731,25 @@ async function handleLiveChatAutoSafeTemplate(req, res, payload) {
   }
 
   const result = await sendLiveChatMessage({ chatId, text: match.reply, visibility: "all" });
+  const verified = await verifyLiveChatMessage({
+    chatId,
+    eventId: result.event_id,
+    text: match.reply,
+    visibility: "all"
+  }).catch(() => false);
   const sentAt = new Date().toISOString();
   await saveLiveChatSafeTemplateRecord(chatId, {
     sentAt,
     intent: match.intent,
     category: match.category,
     eventId: result.event_id || "",
-    source: "widget_auto_safe_template"
+    source: "widget_auto_safe_template",
+    verified
   }).catch(() => null);
 
   await writeAuditLog({
     type: "livechat_widget_auto_safe_sent",
-    status: "ok",
+    status: verified ? "ok" : "verification_pending",
     chatId,
     eventId: result.event_id || "",
     selectedIntent: match.intent,
@@ -763,7 +1760,7 @@ async function handleLiveChatAutoSafeTemplate(req, res, payload) {
     account: { email: account.email || "" }
   });
 
-  return sendJson(res, 200, {
+  return sendJson(res, verified ? 200 : 202, {
     ok: true,
     sent: true,
     reason: "auto_safe_template_sent",
@@ -771,7 +1768,8 @@ async function handleLiveChatAutoSafeTemplate(req, res, payload) {
     eventId: result.event_id || "",
     intent: match.intent,
     category: match.category,
-    sentAt
+    sentAt,
+    verified
   });
 }
 
@@ -1139,8 +2137,18 @@ function buildAiInstructions(account, aiConfig = {}, examples = [], intentsDatas
     buildIntentDatasetBlock(intentsDataset, intentCandidates, { compact }),
     buildStructuredClassificationBlock(Boolean(intentsDataset), { compact }),
     buildExamplesBlock(examples),
-    `Agente activo: ${account.displayName || account.email || "sin nombre"}.`
+    account ? "La solicitud proviene de un agente autenticado." : ""
   ].filter(Boolean).join("\n\n");
+}
+
+function redactExternalAiExamples(examples = []) {
+  return examples.map((example) => ({
+    ...example,
+    question: redactExternalAiText(example.question),
+    answer: redactExternalAiText(example.answer),
+    notes: redactExternalAiText(example.notes),
+    createdBy: example.createdBy ? "[AGENT_REDACTED]" : ""
+  }));
 }
 
 function buildIntentDatasetBlock(intentsDataset, candidates = [], options = {}) {
@@ -1593,13 +2601,5 @@ function normalizeJiraFields(fields) {
 }
 
 function normalizeAttachments(attachments) {
-  if (!Array.isArray(attachments)) {
-    return [];
-  }
-
-  return attachments.slice(0, 6).map((attachment) => ({
-    filename: String(attachment?.filename || attachment?.name || "adjunto").trim(),
-    contentType: String(attachment?.contentType || attachment?.type || "application/octet-stream").trim(),
-    dataBase64: String(attachment?.dataBase64 || "").trim()
-  })).filter((attachment) => attachment.dataBase64);
+  return validateSupportAttachments(attachments);
 }

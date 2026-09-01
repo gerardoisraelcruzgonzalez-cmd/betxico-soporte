@@ -4,20 +4,35 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npx vercel dev",
+    "dev": "node scripts/dev-static.mjs",
+    "dev:vercel": "npx vercel dev",
     "deploy:env": "node scripts/deploy-with-env.mjs",
     "deploy:env:prod": "node scripts/deploy-with-env.mjs --prod",
     "ai:sync-knowledge": "node scripts/sync-openai-knowledge.mjs",
+    "knowledge:build": "python3 scripts/build-manual-knowledge.py",
     "ai:extract-support10": "node scripts/extract-support10-response-candidates.mjs",
     "ai:curate-support10": "node scripts/curate-support10-response-candidates.mjs",
     "ai:integrate-support10": "node scripts/integrate-approved-support10-templates.mjs",
     "ai:mine-flows": "node scripts/mine-livechat-conversation-flows.mjs",
+    "livechat:consult-emails": "node scripts/consult-livechat-emails.mjs",
+    "conectores": "node scripts/start-livechat-connectors.mjs",
+    "conectores:operador": "node scripts/start-livechat-connectors.mjs --with-bob",
+    "atena:connector": "node scripts/atena-local-connector.mjs",
+    "kyc:connector": "node scripts/kyc-local-connector.mjs",
+    "bob:connector": "node scripts/bob-local-connector.mjs",
+    "test:atena": "node scripts/test-atena-extraction.mjs",
+    "test:kyc": "node scripts/test-kyc-extraction.mjs",
+    "test:evidence:e2e": "node scripts/test-real-atena-kyc-orchestrator.mjs",
     "ai:test-support10-templates": "node scripts/test-support10-template-integration.mjs",
     "ai:test-auto-safe-templates": "node scripts/test-auto-safe-templates.mjs",
+    "ai:test-provider": "node scripts/test-ai-provider.mjs",
+    "test:case-operations": "node scripts/test-case-operation-contracts.mjs",
+    "test": "node scripts/test-all.mjs",
     "check": "node scripts/check.mjs"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
-    "pdfjs-dist": "^4.10.38"
+    "pdfjs-dist": "^4.10.38",
+    "playwright": "^1.62.1"
   }
 }

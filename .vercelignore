@@ -1,0 +1,5 @@
+api/assistant-alerts.js
+api/config-status.js
+output/
+outputs/
+.playwright-cli/

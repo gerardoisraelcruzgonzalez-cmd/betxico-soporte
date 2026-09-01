@@ -1,8 +1,21 @@
-import { optionalEnv, readJson, sendJson } from "../lib/http.js";
+import { optionalEnv, readJson, requireWidgetAccess, sendJson } from "../lib/http.js";
+import { requireCurrentAccount } from "../lib/account-store.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { getSupportConfig } from "../lib/remote-config.js";
-import { sendLiveChatMessage } from "../lib/livechat.js";
+import { sendLiveChatMessage, verifyLiveChatMessage } from "../lib/livechat.js";
 import { findSafeAutoTemplateReply } from "../lib/safe-template-replies.js";
+import { requireLegacyAutoSafeSendsEnabled } from "../lib/integration-policy.js";
+import { orchestrateLiveChatCase, publicCaseSummary } from "../lib/case-orchestrator.js";
+import {
+  LIVECHAT_MESSAGE_RETENTION_SECONDS,
+  LIVECHAT_WEBHOOK_MAX_BODY_BYTES,
+  claimLiveChatWebhookReplay,
+  requireLiveChatWebhookConfiguration,
+  sanitizeLiveChatMessagesForPersistence,
+  verifyLiveChatWebhook
+} from "../lib/livechat-webhook-security.js";
+
+const AUTOMATION_RETENTION_SECONDS = 60 * 60 * 24 * 180;
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
@@ -14,7 +27,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const event = await readJson(req);
+    requireLiveChatWebhookConfiguration();
+    const event = await readJson(req, { maxBytes: LIVECHAT_WEBHOOK_MAX_BODY_BYTES });
+    verifyLiveChatWebhook(event);
+    const replay = await claimLiveChatWebhookReplay(event, kvRequest);
+    if (!replay.claimed) {
+      await writeAuditLog({
+        type: "livechat_webhook_replayed",
+        status: "skipped",
+        replaySource: replay.source
+      }).catch(() => null);
+      return sendJson(res, 200, { ok: true, duplicate: true, stored: 0 });
+    }
     const chatId = extractChatId(event);
     const messages = extractMessages(event);
     const existingRecord = chatId ? await getChatRecord(chatId).catch(() => null) : null;
@@ -22,6 +46,21 @@ export default async function handler(req, res) {
     if (chatId && messages.length) {
       await appendChatMessages(chatId, messages, existingRecord);
     }
+
+    let caseRecord = null;
+    if (chatId) {
+      try {
+        caseRecord = await orchestrateLiveChatCase(event, { chatId });
+      } catch (error) {
+        await writeAuditLog({
+          type: "support_case_orchestrator_failed",
+          status: "error",
+          chatId,
+          error: error.message || "support_case_orchestrator_failed"
+        }).catch(() => null);
+      }
+    }
+    const caseSummary = publicCaseSummary(caseRecord);
 
     const autoReply = chatId && messages.length
       ? await maybeSendSafeTemplateAutoReply(chatId, messages, event, existingRecord)
@@ -33,7 +72,10 @@ export default async function handler(req, res) {
       action: event?.action || "",
       webhookId: event?.webhook_id || "",
       organizationId: event?.organization_id || "",
-      chatId
+      chatId,
+      caseState: caseSummary?.state || "",
+      caseWorkflow: caseSummary?.workflow?.id || "",
+      caseRiskLevel: caseSummary?.workflow?.riskLevel || ""
     });
 
     return sendJson(res, 200, {
@@ -45,14 +87,20 @@ export default async function handler(req, res) {
         reason: autoReply.reason || "",
         intent: autoReply.intent || "",
         category: autoReply.category || ""
-      } : undefined
+      } : undefined,
+      case: caseSummary || undefined
     });
   } catch (error) {
-    return sendJson(res, 400, { ok: false, error: error.message || "invalid_webhook" });
+    return sendJson(res, error.statusCode || 400, { ok: false, error: error.message || "invalid_webhook" });
   }
 }
 
 async function maybeSendSafeTemplateAutoReply(chatId, messages, event, existingRecord = null) {
+  try {
+    requireLegacyAutoSafeSendsEnabled();
+  } catch {
+    return { skipped: true, reason: "legacy_auto_safe_send_disabled" };
+  }
   const config = await getSupportConfig().catch(() => ({}));
   const automation = config.liveChatAutomation || {};
   const mode = String(automation.safeTemplateMode || "suggest_only").trim().toLowerCase();
@@ -147,18 +195,25 @@ async function maybeSendSafeTemplateAutoReply(chatId, messages, event, existingR
     await releaseSafeTemplate(chatId).catch(() => null);
     throw error;
   }
+  const verified = await verifyLiveChatMessage({
+    chatId,
+    eventId: result.event_id,
+    text: match.reply,
+    visibility: "all"
+  }).catch(() => false);
   const sentAt = new Date().toISOString();
   await saveSafeTemplateRecord(chatId, {
     sentAt,
     intent: match.intent,
     category: match.category,
     eventId: result.event_id || "",
-    source: "auto_safe_template"
+    source: "auto_safe_template",
+    verified
   }).catch(() => null);
 
   await writeAuditLog({
     type: "livechat_auto_safe_template_sent",
-    status: "ok",
+    status: verified ? "ok" : "verification_pending",
     chatId,
     eventId: result.event_id || "",
     selectedIntent: match.intent,
@@ -170,7 +225,8 @@ async function maybeSendSafeTemplateAutoReply(chatId, messages, event, existingR
 
   return {
     sent: true,
-    reason: "auto_safe_template_sent",
+    verified,
+    reason: verified ? "auto_safe_template_sent" : "auto_safe_template_verification_pending",
     intent: match.intent,
     category: match.category,
     eventId: result.event_id || "",
@@ -180,6 +236,9 @@ async function maybeSendSafeTemplateAutoReply(chatId, messages, event, existingR
 
 async function handleGetChatMessages(req, res) {
   try {
+    requireWidgetAccess(req);
+    await requireCurrentAccount(req);
+
     const url = new URL(req.url || "/", "https://support-livechat-app.vercel.app");
     const chatId = String(url.searchParams.get("chatId") || "").trim();
     if (!chatId) {
@@ -201,20 +260,37 @@ async function handleGetChatMessages(req, res) {
 
 async function appendChatMessages(chatId, messages, existingRecord = null) {
   const existing = existingRecord || { messages: [] };
-  const merged = [...(existing?.messages || []), ...messages]
-    .filter((message) => message.text)
-    .slice(-40);
+  const merged = dedupePersistedMessages(sanitizeLiveChatMessagesForPersistence([
+    ...(existing?.messages || []),
+    ...messages
+  ]));
 
   await kvRequest(["SET", chatKey(chatId), JSON.stringify({
     chatId,
     messages: merged,
     updatedAt: new Date().toISOString()
-  })]);
+  }), "EX", String(LIVECHAT_MESSAGE_RETENTION_SECONDS)]);
 }
 
 async function getChatRecord(chatId) {
   const response = await kvRequest(["GET", chatKey(chatId)]);
-  return response?.result ? JSON.parse(response.result) : null;
+  if (!response?.result) return null;
+  const record = JSON.parse(response.result);
+  const projection = {
+    chatId: String(record?.chatId || chatId).trim(),
+    messages: sanitizeLiveChatMessagesForPersistence(record?.messages),
+    updatedAt: String(record?.updatedAt || "").trim()
+  };
+  if (JSON.stringify(record?.messages || []) !== JSON.stringify(projection.messages)) {
+    await kvRequest([
+      "SET",
+      chatKey(chatId),
+      JSON.stringify(projection),
+      "EX",
+      String(LIVECHAT_MESSAGE_RETENTION_SECONDS)
+    ]).catch(() => null);
+  }
+  return projection;
 }
 
 async function getSafeTemplateRecord(chatId) {
@@ -229,7 +305,7 @@ async function saveSafeTemplateRecord(chatId, record) {
     safe_template_intent: record.intent || "",
     ...record,
     updatedAt: new Date().toISOString()
-  })]);
+  }), "EX", String(AUTOMATION_RETENTION_SECONDS)]);
 }
 
 async function claimSafeTemplate(chatId, record = {}) {
@@ -245,6 +321,8 @@ async function claimSafeTemplate(chatId, record = {}) {
       intent: record.intent || "",
       category: record.category || ""
     }),
+    "EX",
+    String(AUTOMATION_RETENTION_SECONDS),
     "NX"
   ]);
   return response?.result === "OK";
@@ -310,6 +388,7 @@ function extractMessages(event) {
   return dedupeMessages(messages)
     .filter((message) => isCustomerMessage(message.raw))
     .map(({ text, raw }) => ({
+      eventId: String(raw?.event_id || raw?.id || "").trim(),
       text,
       authorType: authorType(raw),
       createdAt: raw?.created_at || raw?.timestamp || new Date().toISOString()
@@ -355,6 +434,16 @@ function dedupeMessages(messages) {
   const seen = new Set();
   return messages.filter((message) => {
     const key = `${message.text}|${message.raw?.created_at || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function dedupePersistedMessages(messages) {
+  const seen = new Set();
+  return messages.filter((message) => {
+    const key = message.eventId || `${message.text}|${message.createdAt}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

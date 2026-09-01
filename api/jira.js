@@ -1,10 +1,55 @@
 import { requireCurrentAccount } from "../lib/account-store.js";
-import { addJiraIssueComment, searchDevWalletTickets, searchJiraTickets } from "../lib/jira.js";
-import { getSlackListPanelItems } from "../lib/slack.js";
+import { requireSlackListReadsEnabled } from "../lib/integration-policy.js";
+import {
+  getJiraIssueTypeFields,
+  getJiraIssueTypes,
+  searchDevWalletTickets,
+  searchJiraTickets
+} from "../lib/jira.js";
 import { getSupportConfig } from "../lib/remote-config.js";
+import { getSlackListPanelItems } from "../lib/slack.js";
 import { optionalEnv, readJson, requireWidgetAccess, sendJson } from "../lib/http.js";
 
 export default async function handler(req, res) {
+  const action = String(req.query?.action || "").trim().toLowerCase();
+
+  if (action === "metadata") {
+    return handleMetadata(req, res);
+  }
+  if (action === "search") {
+    return handleSearch(req, res);
+  }
+
+  return sendJson(res, 404, { ok: false, error: "jira_action_not_found" });
+}
+
+async function handleMetadata(req, res) {
+  if (req.method !== "GET") {
+    return sendJson(res, 405, { ok: false, error: "method_not_allowed" });
+  }
+
+  try {
+    requireWidgetAccess(req);
+    await requireCurrentAccount(req);
+
+    const issueTypeId = String(req.query?.issueTypeId || "").trim();
+    if (issueTypeId) {
+      const meta = await getJiraIssueTypeFields(issueTypeId);
+      return sendJson(res, 200, { ok: true, ...meta });
+    }
+
+    const issueTypes = await getJiraIssueTypes();
+    return sendJson(res, 200, { ok: true, issueTypes });
+  } catch (error) {
+    return sendJson(res, error.statusCode || 500, {
+      ok: false,
+      error: error.message || "jira_metadata_failed",
+      details: error.details || undefined
+    });
+  }
+}
+
+async function handleSearch(req, res) {
   if (!["GET", "POST"].includes(req.method)) {
     return sendJson(res, 405, { ok: false, error: "method_not_allowed" });
   }
@@ -17,6 +62,7 @@ export default async function handler(req, res) {
     }
     if (req.method === "GET" && String(req.query?.mode || "") === "devwallet-slack") {
       requireDevWalletBridge(req);
+      requireSlackListReadsEnabled();
       const emails = String(req.query?.emails || "")
         .split(",")
         .map((email) => email.trim().toLowerCase())
@@ -29,12 +75,11 @@ export default async function handler(req, res) {
     requireWidgetAccess(req);
     const account = await requireCurrentAccount(req);
     if (req.method === "POST") {
-      const payload = await readJson(req);
-      const issueKey = String(payload.issueKey || "").trim();
-      const body = String(payload.body || "").trim();
-      const comment = await addJiraIssueComment(issueKey, body, account);
-
-      return sendJson(res, 200, { ok: true, comment });
+      await readJson(req);
+      return sendJson(res, 409, {
+        ok: false,
+        error: "jira_comment_requires_case_approval"
+      });
     }
 
     const query = String(req.query?.query || "").trim();
@@ -42,7 +87,7 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { ok: true, tickets: [] });
     }
 
-    const tickets = await searchJiraTickets(query);
+    const tickets = await searchJiraTickets(query, account);
     return sendJson(res, 200, { ok: true, tickets });
   } catch (error) {
     return sendJson(res, error.statusCode || 500, {

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log("Usage: npm run deploy:env -- [env-file]");
+  console.log("       npm run deploy:env -- --enable-slack-sync [env-file]");
   console.log("       npm run deploy:env:prod -- [env-file]");
   console.log("");
   console.log("Default env file: .env.vercel.local");
@@ -13,8 +14,9 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 const positional = process.argv.slice(2).find((arg) => !arg.startsWith("-"));
 const envFile = resolve(positional || ".env.vercel.local");
 const target = process.argv.includes("--prod") ? "--prod" : null;
+const enableSlackSync = !target && process.argv.includes("--enable-slack-sync");
 
-const required = [
+const productionRequired = [
   "JIRA_BASE_URL",
   "JIRA_EMAIL",
   "JIRA_API_TOKEN",
@@ -30,7 +32,48 @@ if (!existsSync(envFile)) {
 }
 
 const env = parseEnv(readFileSync(envFile, "utf8"));
-const missing = required.filter((key) => !String(env[key] || "").trim());
+const cliEnv = {
+  ...process.env,
+  ...(usableValue(env.VERCEL_OIDC_TOKEN) ? { VERCEL_OIDC_TOKEN: env.VERCEL_OIDC_TOKEN } : {})
+};
+const ignoredDeploymentEnv = new Set([
+  "VERCEL",
+  "VERCEL_ENV",
+  "VERCEL_TARGET_ENV",
+  "VERCEL_OIDC_TOKEN",
+  "NX_DAEMON",
+  "TURBO_CACHE",
+  "TURBO_FORCE",
+  "TURBO_REMOTE_ONLY",
+  "TURBO_RUN_SUMMARY"
+]);
+for (const key of ignoredDeploymentEnv) {
+  delete env[key];
+}
+if (!target) {
+  const hasSimulatorActionTarget = Boolean(
+    usableValue(env.SUPPORT_SIMULATOR_JIRA_KEYS)
+    || usableValue(env.SUPPORT_SIMULATOR_SLACK_ROUTES)
+  );
+  const simulatorRealActionsEnabled = env.SUPPORT_SIMULATOR_REAL_ACTIONS_ENABLED === "true"
+    && hasSimulatorActionTarget;
+  Object.assign(env, {
+    ALLOW_UNAUTHENTICATED_WIDGET: "false",
+    JIRA_BASE_URL: usableValue(env.JIRA_BASE_URL) || "https://betxico.atlassian.net",
+    JIRA_ISSUE_TYPE: usableValue(env.JIRA_ISSUE_TYPE) || "Servicio al Cliente",
+    JIRA_PROJECT_KEY: usableValue(env.JIRA_PROJECT_KEY) || "BTF",
+    SUPPORT_AGENT_MODE: "suggest",
+    SUPPORT_LEGACY_AUTO_SAFE_SEND_ENABLED: "false",
+    SUPPORT_SLACK_LIST_READS_ENABLED: "false",
+    SUPPORT_SLACK_LIST_SYNC_ENABLED: enableSlackSync ? "true" : "false",
+    SUPPORT_SIMULATOR_ENABLED: "true",
+    SUPPORT_SIMULATOR_KNOWLEDGE_ENABLED: "true",
+    SUPPORT_SIMULATOR_ALLOWED_EMAILS: usableValue(env.SUPPORT_SIMULATOR_ALLOWED_EMAILS)
+      || "gerardo.cruz@betxico.mx",
+    SUPPORT_SIMULATOR_REAL_ACTIONS_ENABLED: simulatorRealActionsEnabled ? "true" : "false"
+  });
+}
+const missing = (target ? productionRequired : []).filter((key) => !usableValue(env[key]));
 
 if (missing.length) {
   console.error(`Missing required values: ${missing.join(", ")}`);
@@ -43,17 +86,21 @@ if (target) {
 }
 
 for (const [key, value] of Object.entries(env)) {
-  if (String(value).trim()) {
+  if (usableValue(value)) {
     args.push("-e", `${key}=${value}`);
   }
 }
 
 console.log(`Deploying to Vercel with ${Object.keys(env).length} environment values.`);
 console.log("Secret values are not printed.");
+if (!target) {
+  console.log(`Preview safety: suggest-only, authenticated widget, Slack reads off, Slack sync ${enableSlackSync ? "temporarily enabled" : "off"}, legacy sends off.`);
+  console.log(`Private simulator: enabled; real writes ${env.SUPPORT_SIMULATOR_REAL_ACTIONS_ENABLED === "true" ? "allowlisted" : "off"}.`);
+}
 
 const result = spawnSync("npx", args, {
   stdio: "inherit",
-  env: process.env
+  env: cliEnv
 });
 
 process.exit(result.status ?? 1);
@@ -61,7 +108,7 @@ process.exit(result.status ?? 1);
 function parseEnv(input) {
   const output = {};
 
-  for (const rawLine of input.split(/\r?\n/)) {
+  for (const rawLine of input.split(/\r\n?|\n|\u2028|\u2029/u)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) {
       continue;
@@ -86,4 +133,9 @@ function parseEnv(input) {
   }
 
   return output;
+}
+
+function usableValue(value) {
+  const clean = String(value || "").trim();
+  return clean && !/^\[?redacted\]?$/i.test(clean) ? clean : "";
 }

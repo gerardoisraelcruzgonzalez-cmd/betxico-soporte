@@ -8,6 +8,8 @@ import {
 } from "../lib/account-store.js";
 import { optionalEnv, readJson, sendJson } from "../lib/http.js";
 import { getSlackUserTokenStatus, saveSlackUserToken } from "../lib/slack-user-tokens.js";
+import { syncSlackListPanelCache } from "../lib/slack.js";
+import { SUPPORT_SLACK_PANEL_ID, isSupportAdmin } from "../lib/remote-config.js";
 
 export default async function handler(req, res) {
   const action = String(req.query?.action || "").trim();
@@ -25,6 +27,9 @@ export default async function handler(req, res) {
   }
   if (action === "status") {
     return handleStatus(req, res);
+  }
+  if (action === "sync") {
+    return handleSync(req, res);
   }
   if (!action && hasSlackCallback && callbackState?.nonce) {
     return handleSignInCallback(req, res, callbackState);
@@ -205,6 +210,41 @@ async function handleStatus(req, res) {
   }
 }
 
+async function handleSync(req, res) {
+  if (req.method !== "POST") {
+    return sendJson(res, 405, { ok: false, error: "method_not_allowed" });
+  }
+
+  try {
+    await readJson(req).catch(() => ({}));
+    const account = await getCurrentAccount(req);
+    if (!account?.email) {
+      const error = new Error("invalid_login");
+      error.statusCode = 401;
+      throw error;
+    }
+    if (!(await isSupportAdmin(account.email))) {
+      const error = new Error("admin_not_authorized");
+      error.statusCode = 403;
+      throw error;
+    }
+    const tokenStatus = await getSlackUserTokenStatus(account.email);
+    if (!tokenStatus.connected) {
+      const error = new Error("slack_user_not_connected");
+      error.statusCode = 400;
+      throw error;
+    }
+    const sync = await syncSlackListPanelCache(SUPPORT_SLACK_PANEL_ID, { accountEmail: account.email });
+    return sendJson(res, 200, { ok: true, sync });
+  } catch (error) {
+    return sendJson(res, error.statusCode || 500, {
+      ok: false,
+      error: error.message || "slack_list_sync_failed",
+      details: error.details || undefined
+    });
+  }
+}
+
 async function handleCallback(req, res, verifiedState = null) {
   if (req.method !== "GET") {
     res.statusCode = 405;
@@ -255,7 +295,19 @@ async function handleCallback(req, res, verifiedState = null) {
       scope: data.authed_user.scope || data.scope || ""
     });
 
-    return sendHtml(res, 200, "Slack personal conectado", "Ya puedes cerrar esta pestaña y volver a LiveChat.");
+    let syncMessage = "Lista 8 sincronizada con tu sesión.";
+    try {
+      const sync = await syncSlackListPanelCache(SUPPORT_SLACK_PANEL_ID, { accountEmail: state.email });
+      syncMessage = `Lista 8 sincronizada: ${Number(sync.itemCount) || 0} registros disponibles.`;
+    } catch (syncError) {
+      // Keep the successful OAuth connection even when Slack declines the new
+      // list scope. The callback page exposes the exact next action to the user.
+      syncMessage = syncError?.message === "missing_scope"
+        ? "Slack quedó conectado, pero falta autorizar el permiso lists:read. Repite la conexión y acepta el permiso de listas."
+        : "Slack quedó conectado; no pude sincronizar Lista 8 todavía. Vuelve a intentar la conexión en unos minutos.";
+    }
+
+    return sendHtml(res, 200, "Slack personal conectado", syncMessage);
   } catch (error) {
     return sendHtml(res, error.statusCode || 500, "No pude conectar Slack", error.message || "slack_oauth_callback_failed");
   }
@@ -266,11 +318,11 @@ function getSlackOAuthConfig(req) {
   const clientSecret = optionalEnv("SLACK_CLIENT_SECRET");
   const origin = getOrigin(req);
   const callbackUrl = optionalEnv("SLACK_USER_OAUTH_CALLBACK_URL", `${origin}/api/slack-user`);
-  const userScopes = optionalEnv("SLACK_USER_SCOPES", "chat:write")
+  const userScopes = optionalEnv("SLACK_USER_SCOPES", "chat:write,lists:read")
     .split(",")
     .map((scope) => scope.trim())
     .filter(Boolean)
-    .join(",") || "chat:write";
+    .join(",") || "chat:write,lists:read";
 
   return {
     clientId,
