@@ -4,6 +4,7 @@ import {
   getAccount,
   getCurrentAccount,
   publicAccount,
+  saveAccount,
   setSessionCookie
 } from "../lib/account-store.js";
 import { optionalEnv, readJson, sendJson } from "../lib/http.js";
@@ -128,6 +129,10 @@ async function handleSignInCallback(req, res, verifiedState = null) {
       displayName: profile.name || profile.given_name || existing?.displayName || email,
       jiraEmail: existing?.jiraEmail || email
     }, existing || {}, { allowPasswordless: true });
+
+    account.slackAuthenticatedAt = new Date().toISOString();
+    account.slackAuthProvider = "slack";
+    await saveAccount(account.email, account);
 
     setSessionCookie(res, account.email);
     return sendHtml(res, 200, "Sesión iniciada con Slack", "Ya puedes cerrar esta pestaña y volver a LiveChat.", publicAccount(account, account.email));

@@ -5,7 +5,7 @@ import {
   publicAccount,
   setSessionCookie
 } from "../lib/account-store.js";
-import { readJson, sendJson } from "../lib/http.js";
+import { optionalEnv, readJson, sendJson } from "../lib/http.js";
 import { assertLoginAllowed, clearLoginFailures, recordLoginFailure } from "../lib/login-rate-limit.js";
 import { isSupportAdmin } from "../lib/remote-config.js";
 import { getAgentToolAccess } from "../lib/tool-access.js";
@@ -31,6 +31,11 @@ async function handleLogin(req, res) {
 
   let payload = {};
   try {
+    if (!isEmailPinLoginEnabled()) {
+      const error = new Error("slack_login_required");
+      error.statusCode = 403;
+      throw error;
+    }
     payload = await readJson(req);
     await assertLoginAllowed(req, payload.email);
     const { userId, account } = await authenticateWithPreviewFallback(payload.email, payload.pin);
@@ -57,6 +62,12 @@ async function handleLogin(req, res) {
       details: error.details || undefined
     });
   }
+}
+
+export function isEmailPinLoginEnabled(env = process.env) {
+  const configured = String(env.SUPPORT_EMAIL_PIN_LOGIN_ENABLED || "").trim().toLowerCase();
+  if (configured) return configured === "true";
+  return String(env.VERCEL_ENV || env.NODE_ENV || "").trim().toLowerCase() !== "production";
 }
 
 async function authenticateWithPreviewFallback(email, pin) {

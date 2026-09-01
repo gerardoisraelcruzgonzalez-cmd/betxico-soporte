@@ -12,6 +12,7 @@ import { getAgentToolAccess } from "../lib/tool-access.js";
 import { resolveAccountSettingsWrite } from "../lib/account-policy.js";
 import { assertLoginAllowed, clearLoginFailures, recordLoginFailure } from "../lib/login-rate-limit.js";
 import { readJson, sendJson } from "../lib/http.js";
+import { isEmailPinLoginEnabled } from "./auth.js";
 
 export default async function handler(req, res) {
   try {
@@ -59,6 +60,11 @@ export default async function handler(req, res) {
 
 async function handleDeviceAuth(req, res) {
   if (req.method === "POST") {
+    if (!isEmailPinLoginEnabled()) {
+      const error = new Error("slack_login_required");
+      error.statusCode = 403;
+      throw error;
+    }
     const payload = await readJson(req);
     await assertLoginAllowed(req, payload.email);
     let issued;

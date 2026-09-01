@@ -162,8 +162,6 @@ const elements = {
   settingsView: document.getElementById("settingsView"),
   loginForm: document.getElementById("loginForm"),
   slackLoginBtn: document.getElementById("slackLoginBtn"),
-  loginEmail: document.getElementById("loginEmail"),
-  loginPin: document.getElementById("loginPin"),
   accountForm: document.getElementById("accountForm"),
   accountDisplayName: document.getElementById("accountDisplayName"),
   accountEmail: document.getElementById("accountEmail"),
@@ -519,7 +517,6 @@ function initialize() {
     });
   });
   elements.slackLoginBtn.addEventListener("click", handleSlackLoginStart);
-  elements.loginForm.addEventListener("submit", handleLogin);
   elements.accountForm.addEventListener("submit", handleSaveAccount);
   elements.slackUserConnectBtn.addEventListener("click", handleSlackUserConnect);
   elements.reloadSupportConfigBtn.addEventListener("click", loadSupportConfig);
@@ -628,7 +625,6 @@ function renderAccount() {
     renderAgentAlert();
     stopSupportConfigPolling();
     showView("settings");
-    requestAnimationFrame(() => elements.loginEmail?.focus());
     return;
   }
 
@@ -961,32 +957,6 @@ function fillUserSelects() {
   }
   if (getFieldDefault("assigneeAccountId")) {
     elements.defaultAssigneeAccountId.value = getFieldDefault("assigneeAccountId");
-  }
-}
-
-async function handleLogin(event) {
-  event.preventDefault();
-  hideResult();
-
-  try {
-    const data = await fetchJson("/api/auth-login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: elements.loginEmail.value.trim(),
-        pin: elements.loginPin.value.trim()
-      })
-    });
-    currentAccount = data.account;
-    elements.loginPin.value = "";
-    renderAccount();
-    showView("search");
-    showResult("Sesión iniciada.", "success");
-    loadSupportConfig();
-    loadPublicSupportConfig();
-    startSupportConfigPolling();
-  } catch (error) {
-    showResult(`No pude iniciar sesión: ${formatError(error.message)}`, "error");
   }
 }
 
@@ -1847,7 +1817,7 @@ function renderReportWorkflowOptions(previousValue = "") {
 function showView(view) {
   if (!currentAccount && view !== "settings") {
     view = "settings";
-    showResult("Primero inicia sesión con tu correo y PIN o con Slack.", "error");
+    showResult("Primero inicia sesión con Slack.", "error");
   }
 
   const isTicket = view === "ticket";
@@ -1897,7 +1867,7 @@ function ensureAuthenticated() {
     return true;
   }
   showView("settings");
-  showResult("Primero inicia sesión con tu correo y PIN o con Slack para usar el centro de tickets.", "error");
+  showResult("Primero inicia sesión con Slack para usar el centro de tickets.", "error");
   return false;
 }
 
@@ -5005,9 +4975,10 @@ function formatError(message) {
     openai_quota_exceeded: "OpenAI indica que la cuenta no tiene cuota disponible o falta billing activo. Revisa plan, saldo o metodo de pago de OpenAI.",
     openai_request_failed: "OpenAI rechazo la consulta. Revisa el modelo, la llave o los limites de la cuenta.",
     missing_message: "escribe una consulta para el asistente IA.",
-    invalid_login: "correo o PIN incorrecto.",
+    invalid_login: "no se pudo validar la sesión.",
+    slack_login_required: "debes iniciar sesión con Slack para usar la app.",
     bob_customer_data_required: "completa nombre y correo válido del cliente antes de solicitar el cierre.",
-    login_required: "primero inicia sesión con tu correo y PIN o con Slack.",
+    login_required: "primero inicia sesión con Slack.",
     slack_signin_not_configured: "falta configurar Sign in with Slack en Vercel.",
     invalid_slack_signin_state: "la autorización de Slack venció o no corresponde a esta sesión.",
     slack_signin_email_missing: "Slack no devolvió el correo del usuario.",

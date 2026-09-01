@@ -510,21 +510,9 @@
       </form>
 
       <section id="settingsView" class="settings-view app-view">
-        <form id="loginForm" class="settings-form settings-card-simple login-card" autocomplete="on">
+        <form id="loginForm" class="settings-form settings-card-simple login-card" autocomplete="off">
           <h2>Iniciar sesión</h2>
-          <p class="settings-note span-2">Ingresa con el correo y PIN asignados a tu cuenta.</p>
-          <div class="login-credentials-grid span-2">
-            <label>
-              Correo
-              <input id="loginEmail" type="email" autocomplete="username" placeholder="agente@betxico.mx" required autofocus>
-            </label>
-            <label>
-              PIN
-              <input id="loginPin" type="password" autocomplete="current-password" placeholder="PIN" required>
-            </label>
-            <button id="loginBtn" type="submit">Entrar</button>
-          </div>
-          <div class="login-divider span-2"><span>o</span></div>
+          <p class="settings-note span-2">El acceso operativo requiere autenticación con Slack. Tu identidad de Slack se utiliza para atribuir las publicaciones.</p>
           <button id="slackLoginBtn" type="button" class="slack-login-button span-2">
             <span class="slack-mark" aria-hidden="true">
               <span></span><span></span><span></span><span></span>
@@ -535,7 +523,7 @@
 
         <form id="accountForm" class="settings-form settings-card-simple" hidden>
           <h2>Configuración de cuenta</h2>
-          <p class="settings-note span-2">Puedes iniciar con correo y PIN o con Slack. El token personal de Jira es opcional cuando está disponible la configuración central.</p>
+          <p class="settings-note span-2">Tu cuenta queda vinculada al correo de Slack. El token personal de Jira se guarda cifrado en esa misma cuenta y no se comparte con otros agentes.</p>
           <label>
             Nombre
             <input id="accountDisplayName" type="text" autocomplete="name" placeholder="Nombre del agente">

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { isSameOriginBrowserRequest, requireWidgetAccess } from "../lib/http.js";
+import { isEmailPinLoginEnabled } from "../api/auth.js";
 
 const previousNodeEnv = process.env.NODE_ENV;
 const previousAllow = process.env.ALLOW_UNAUTHENTICATED_WIDGET;
@@ -24,6 +25,8 @@ try {
   assert.doesNotThrow(() => requireWidgetAccess({
     headers: { host: "support.example.com", authorization: `Bearer btq_${"a".repeat(40)}` }
   }));
+  assert.equal(isEmailPinLoginEnabled({ VERCEL_ENV: "production" }), false);
+  assert.equal(isEmailPinLoginEnabled({ NODE_ENV: "development" }), true);
 } finally {
   if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
   else process.env.NODE_ENV = previousNodeEnv;
@@ -33,4 +36,4 @@ try {
   else process.env.INTERNAL_API_KEY = previousKey;
 }
 
-console.log("Widget access: 5 pruebas correctas.");
+console.log("Widget access y login Slack-only: 7 pruebas correctas.");

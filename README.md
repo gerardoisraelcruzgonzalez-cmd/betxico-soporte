@@ -47,7 +47,7 @@ El simulador privado se abre en:
 http://localhost:3000/simulator.html
 ```
 
-Necesita sesion normal por correo/PIN o Slack, una cuenta administradora autorizada y `SUPPORT_SIMULATOR_ENABLED=true`. Los mensajes enviados como Cliente activan la respuesta de la app; los enviados como Agente se agregan manualmente sin una segunda respuesta automatica.
+Necesita una sesion autenticada con Slack, una cuenta administradora autorizada y `SUPPORT_SIMULATOR_ENABLED=true`. El simulador local conserva su flujo de prueba separado; los mensajes enviados como Cliente activan la respuesta de la app y los enviados como Agente se agregan manualmente sin una segunda respuesta automatica.
 
 En preview, `SUPPORT_SIMULATOR_KNOWLEDGE_ENABLED=true` conecta el indice generado desde el manual maestro exclusivamente al simulador. La consulta devuelve como maximo cinco fragmentos de orientacion por turno. El manual no confirma estados de cuenta ni autoriza acciones; Jira, Slack Lista 8, Atena y KYC siguen siendo evidencias independientes. El flujo productivo de atencion no invoca esta herramienta y la bandera se ignora cuando `VERCEL_ENV=production`.
 
@@ -226,7 +226,7 @@ El campo `Team` se manda con `JIRA_DEFAULT_TEAM_ID`, porque Jira Cloud no acepta
 La app soporta sesion por agente:
 
 - El agente entra en `Configuracion`.
-- Crea/inicia sesion con correo y PIN.
+- Inicia sesion con Slack; la identidad de Slack queda vinculada a la cuenta.
 - Guarda su Jira email y API token una sola vez.
 - El buscador global y el expediente usan esas credenciales Jira del agente activo.
 - El token se guarda cifrado en KV/Redis usando `SUPPORT_ENCRYPTION_KEY`.
@@ -272,7 +272,7 @@ Requisitos del backend APP Betxico:
 ### Clientes de dispositivo (Raycast)
 
 Raycast y otros clientes internos usan tokens personales revocables, no
-`INTERNAL_API_KEY`. El cliente inicia sesion una vez con correo y PIN mediante
+`INTERNAL_API_KEY`. El cliente inicia sesion una vez con Slack mediante
 `POST /api/account-settings?action=device-auth`; el backend devuelve un token `btq_...` valido por 90
 dias y guarda solamente su hash en KV.
 
