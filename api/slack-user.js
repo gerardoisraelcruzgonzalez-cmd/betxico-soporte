@@ -412,12 +412,12 @@ function getSlackOAuthConfig(req) {
   const clientSecret = optionalEnv("SLACK_CLIENT_SECRET");
   const origin = getOrigin(req);
   const callbackUrl = optionalEnv("SLACK_USER_OAUTH_CALLBACK_URL", `${origin}/api/slack-user`);
-  const userScopes = [...new Set(optionalEnv("SLACK_USER_SCOPES", "chat:write,lists:read,users:read.email")
+  const userScopes = [...new Set(optionalEnv("SLACK_USER_SCOPES", "chat:write,lists:read,users:read,users:read.email")
     .split(",")
     .map((scope) => scope.trim())
     .filter(Boolean)
-    .concat("users:read.email"))]
-    .join(",") || "chat:write,lists:read,users:read.email";
+    .concat("users:read", "users:read.email"))]
+    .join(",") || "chat:write,lists:read,users:read,users:read.email";
 
   return {
     clientId,
