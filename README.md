@@ -303,7 +303,7 @@ Flujo obligatorio:
 6. Ejecutar una sola vez y verificar el contenido en el proveedor.
 7. Si la ejecucion se interrumpe, conciliar sin reenviar.
 
-Para desarrollo y preview usa `SUPPORT_AGENT_MODE=suggest`. `approved_actions` solo debe habilitarse despues de validar proveedores reales. El expediente consulta la cache compartida de Slack Lista 8 (`F0BS8SERTNE`), actualizada cada cuatro minutos por Vercel Cron, y conserva Lista 7 (`F0BNV1FR02J`) como cache historica con refresco cada 24 horas; nunca consulta Slack directamente durante un chat. Las respuestas automaticas heredadas permanecen apagadas. Consulta [docs/agent-operations-program.md](docs/agent-operations-program.md) para controles, criterios y continuidad.
+Para desarrollo y preview usa `SUPPORT_AGENT_MODE=suggest`. `approved_actions` solo debe habilitarse despues de validar proveedores reales. En el plan Hobby, la cache compartida de Slack Lista 8 (`F0BS8SERTNE`) se actualiza mediante el boton o la ruta de sincronizacion manual; Vercel Cron de cuatro minutos no esta activo. Lista 7 (`F0BNV1FR02J`) se conserva como cache historica con refresco cada 24 horas. El expediente nunca consulta Slack directamente durante un chat. Las respuestas automaticas heredadas permanecen apagadas. Consulta [docs/agent-operations-program.md](docs/agent-operations-program.md) para controles, criterios y continuidad.
 
 Validacion local completa:
 
@@ -458,7 +458,7 @@ En Text Developer Console:
 
 1. Crear una app privada.
 2. Agregar `LiveChat Widgets`.
-3. Usar como Widget source URL la URL desplegada de `public/index.html`.
+3. Usar como Widget source URL la URL desplegada de la raiz publicada (`/`). La carpeta `public/` es la superficie de prueba local.
 4. Elegir placement `Details section`.
 5. Instalar en `Private installation`.
 6. Opcional: agregar `Chat Webhooks` apuntando a `/api/livechat-webhook`.
