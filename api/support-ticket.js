@@ -386,6 +386,10 @@ async function handleCaseRefresh(req, res, payload) {
     }
   }
   if (!existing) return sendJson(res, 404, { ok: false, error: "support_case_not_found" });
+  // A chat id identifies a conversation, not the customer. LiveChat can
+  // issue another chat id for the same customer, so prefer current identity.
+  const widgetCustomer = normalizeWidgetCustomer(payload.customer);
+  const resolvedCustomer = mergeLookupCustomer(existing.customer, widgetCustomer);
   const activeAction = await caseActionStore.getLatestByChat(chatId);
   if (["proposed", "approved", "executing", "verification_pending"].includes(activeAction?.status)) {
     return sendJson(res, 200, {
@@ -396,7 +400,7 @@ async function handleCaseRefresh(req, res, payload) {
     });
   }
 
-  const query = caseLookupIdentity(existing);
+  const query = caseLookupIdentity({ ...existing, customer: resolvedCustomer });
   const tools = createCaseReadTools({
     jiraSearch: (value) => searchJiraTickets(value, account),
     cacheLookup: lookupSlackListCache,
@@ -417,7 +421,7 @@ async function handleCaseRefresh(req, res, payload) {
     : existing.systemFacts?.caseKycReview || null;
   const updated = await updateSupportCase(chatId, (current) => evolveSupportCase(current || existing, {
     chatId,
-    customer: (current || existing).customer,
+    customer: resolvedCustomer,
     events: [],
     systemFacts: {
       caseJiraLookup: results.jira,
@@ -930,13 +934,25 @@ function cleanCaseIdentifier(value) {
 
 function caseLookupIdentity(caseRecord = {}) {
   const identity = {};
-  const ticketKey = String(caseRecord.facts?.ticketKey || "").trim();
-  if (ticketKey) identity.ticketKey = ticketKey;
   const email = String(caseRecord.customer?.email || "").trim();
   if (email) identity.email = email;
   const authId = String(caseRecord.customer?.authId || caseRecord.customer?.liveChatCustomerId || "").trim();
   if (authId) identity.authId = authId;
+  // A known ticket is only a fallback when the customer identity is absent.
+  if (!identity.email && !identity.authId) {
+    const ticketKey = String(caseRecord.facts?.ticketKey || "").trim();
+    if (ticketKey) identity.ticketKey = ticketKey;
+  }
   return identity;
+}
+
+function mergeLookupCustomer(existing = {}, incoming = {}) {
+  return {
+    liveChatCustomerId: String(incoming.liveChatCustomerId || existing.liveChatCustomerId || "").trim().slice(0, 180),
+    authId: String(incoming.authId || existing.authId || "").replace(/[^0-9]/gu, "").slice(0, 32),
+    email: String(incoming.email || existing.email || "").trim().toLowerCase(),
+    name: String(incoming.name || existing.name || "").trim().slice(0, 180)
+  };
 }
 
 function operationalCaseView(caseRecord) {

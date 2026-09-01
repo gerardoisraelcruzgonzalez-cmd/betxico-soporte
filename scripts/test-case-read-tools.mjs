@@ -3,12 +3,27 @@ import {
   createCaseReadTools,
   lookupJiraCase,
   lookupKycCase,
-  lookupSlackCase
+  lookupSlackCase,
+  normalizeCaseReadQuery
 } from "../lib/case-read-tools.js";
 import { buildSlackCacheCoverage } from "../lib/slack.js";
 
 const NOW = "2026-08-11T18:00:00.000Z";
 const tests = [];
+
+test("La identidad acepta correo o AUTH ID y prioriza correo sobre un ticket", async () => {
+  assert.deepEqual(normalizeCaseReadQuery({
+    ticketKey: "BTF-11634",
+    email: "Cliente@Example.com",
+    authId: "922028"
+  }), { type: "email", value: "cliente@example.com" });
+  assert.deepEqual(normalizeCaseReadQuery({ authId: "922028" }), {
+    type: "auth_id", value: "922028"
+  });
+  assert.deepEqual(normalizeCaseReadQuery({ ticketKey: "btf-11634" }), {
+    type: "ticket_key", value: "BTF-11634"
+  });
+});
 
 test("Jira devuelve expediente minimo por correo y conserva el texto como no confiable", async () => {
   let received;
