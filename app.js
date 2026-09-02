@@ -1431,12 +1431,8 @@ function renderKycResult(result, index) {
         ${fields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "—")}</dd></div>`).join("")}
       </dl>
       <div class="kyc-checks">${checkItems}</div>
-      <section class="kyc-documents">
-        <div class="kyc-documents-heading"><b>Documentos</b><span>Haz clic para revisar legibilidad</span></div>
-        <div class="kyc-document-grid">${documents}</div>
-      </section>
       <section class="kyc-livechat-actions" data-kyc-user-id="${escapeHtml(result?.id || "")}">
-        <b>Editar en KYC</b>
+        <b>Acciones KYC</b>
         <div class="kyc-livechat-edit-actions">
           ${fields.filter(([, value]) => value !== undefined && value !== null).map(([label, value]) => {
             const field = KYC_EDIT_FIELD_BY_LABEL[label];
@@ -1447,6 +1443,10 @@ function renderKycResult(result, index) {
           ${Object.entries(KYC_DOCUMENT_LABELS).map(([type, label]) => `<button type="button" class="kyc-mutation-upload" data-kyc-document="${type}">${label}</button>`).join("")}
         </div>
         <small class="kyc-mutation-status" aria-live="polite"></small>
+      </section>
+      <section class="kyc-documents">
+        <div class="kyc-documents-heading"><b>Documentos</b><span>Haz clic para revisar legibilidad</span></div>
+        <div class="kyc-document-grid">${documents}</div>
       </section>
       ${profileLink}
     </article>`;
