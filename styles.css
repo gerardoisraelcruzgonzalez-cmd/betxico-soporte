@@ -6869,6 +6869,9 @@ a.customer-auto-result:hover {
 .kyc-livechat-actions { margin-top: 12px; padding-top: 10px; border-top: 1px solid #d7dfec; display: grid; gap: 8px; }
 .kyc-livechat-actions > b { font-size: 12px; color: #27476f; }
 .kyc-livechat-edit-actions, .kyc-livechat-upload-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.kyc-inline-edit { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 6px; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.kyc-inline-edit > span:last-child { color: #638cc1; font-size: 13px; opacity: .75; }
+.kyc-editable-field:hover { outline: 1px solid #9dbde5; outline-offset: 1px; border-radius: 5px; }
 .kyc-livechat-actions button { border: 1px solid #b8c7dc; background: #fff; color: #24466f; border-radius: 5px; padding: 5px 8px; font-size: 11px; cursor: pointer; }
 .kyc-livechat-actions button:hover { background: #eef5ff; border-color: #638cc1; }
 .kyc-mutation-status { min-height: 15px; color: #53647a; font-size: 11px; }

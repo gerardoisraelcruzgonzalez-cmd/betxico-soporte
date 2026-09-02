@@ -1428,17 +1428,17 @@ function renderKycResult(result, index) {
       </div>
       ${duplicate}
       <dl class="kyc-personal-grid">
-        ${fields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "—")}</dd></div>`).join("")}
+        ${fields.map(([label, value]) => {
+          const field = KYC_EDIT_FIELD_BY_LABEL[label];
+          const displayValue = value || "—";
+          return field
+            ? `<div class="kyc-editable-field"><dt>${escapeHtml(label)}</dt><dd><button type="button" class="kyc-inline-edit" data-kyc-field="${field}" data-kyc-label="${escapeHtml(label)}" data-kyc-value="${escapeHtml(value || "")}"><span>${escapeHtml(displayValue)}</span><span aria-hidden="true">✎</span></button></dd></div>`
+            : `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(displayValue)}</dd></div>`;
+        }).join("")}
       </dl>
       <div class="kyc-checks">${checkItems}</div>
       <section class="kyc-livechat-actions" data-kyc-user-id="${escapeHtml(result?.id || "")}">
-        <b>Acciones KYC</b>
-        <div class="kyc-livechat-edit-actions">
-          ${fields.filter(([, value]) => value !== undefined && value !== null).map(([label, value]) => {
-            const field = KYC_EDIT_FIELD_BY_LABEL[label];
-            return field ? `<button type="button" class="kyc-mutation-edit" data-kyc-field="${field}" data-kyc-value="${escapeHtml(value || "")}">${escapeHtml(label)}</button>` : "";
-          }).join("")}
-        </div>
+        <b>Documentos KYC</b>
         <div class="kyc-livechat-upload-actions">
           ${Object.entries(KYC_DOCUMENT_LABELS).map(([type, label]) => `<button type="button" class="kyc-mutation-upload" data-kyc-document="${type}">${label}</button>`).join("")}
         </div>
@@ -1461,7 +1461,7 @@ const KYC_EDIT_FIELD_BY_LABEL = {
 const KYC_DOCUMENT_LABELS = { selfie: "Selfie", ineFront: "INE Frente", ineBack: "INE Vuelta", proofOfAddress: "Comprobante" };
 
 async function handleKycResultAction(event) {
-  const edit = event.target.closest(".kyc-mutation-edit");
+  const edit = event.target.closest(".kyc-inline-edit");
   const upload = event.target.closest(".kyc-mutation-upload");
   if (!edit && !upload) {
     handleKycDocumentClick(event);
@@ -1473,7 +1473,7 @@ async function handleKycResultAction(event) {
   if (!userId) return;
   if (edit) {
     const current = edit.dataset.kycValue || "";
-    const value = window.prompt(`Nuevo valor para ${edit.textContent}:`, current);
+    const value = window.prompt(`Nuevo valor para ${edit.dataset.kycLabel || "este campo"}:`, current);
     if (value === null || !value.trim() || value.trim() === current) return;
     await submitKycMutation({ userId, operation: "edit", field: edit.dataset.kycField, value: value.trim(), status });
     return;
