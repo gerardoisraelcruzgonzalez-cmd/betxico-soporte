@@ -6866,6 +6866,13 @@ a.customer-auto-result:hover {
     0 4px 0 rgba(104, 44, 20, 0.35);
 }
 
+.kyc-livechat-actions { margin-top: 12px; padding-top: 10px; border-top: 1px solid #d7dfec; display: grid; gap: 8px; }
+.kyc-livechat-actions > b { font-size: 12px; color: #27476f; }
+.kyc-livechat-edit-actions, .kyc-livechat-upload-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.kyc-livechat-actions button { border: 1px solid #b8c7dc; background: #fff; color: #24466f; border-radius: 5px; padding: 5px 8px; font-size: 11px; cursor: pointer; }
+.kyc-livechat-actions button:hover { background: #eef5ff; border-color: #638cc1; }
+.kyc-mutation-status { min-height: 15px; color: #53647a; font-size: 11px; }
+
 .kyc-result-title {
   display: flex;
   align-items: flex-start;
