@@ -77,13 +77,17 @@ async function mutate(job) {
   const tempDir = job.operation === "upload" ? await mkdtemp(path.join(process.env.TMPDIR || "/tmp", "betxico-kyc-")) : "";
   try {
     await page.goto(`${KYC_BASE_URL}/dashboard/users/${encodeURIComponent(job.userId)}`, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => undefined);
+    await page.waitForTimeout(1200);
     if (job.operation === "edit") return await editField(page, job);
     const file = job.document?.file;
     if (!file?.dataBase64) throw new Error("kyc_document_missing");
     const filePath = path.join(tempDir, file.filename || "documento");
     await writeFile(filePath, Buffer.from(file.dataBase64, "base64"));
-    const button = page.getByRole("button", { name: DOCUMENT_BUTTONS[job.document.type], exact: true });
+    const buttonLabel = DOCUMENT_BUTTONS[job.document.type];
+    const roleButton = page.getByRole("button", { name: buttonLabel, exact: true });
+    const textButton = page.locator("button").filter({ hasText: new RegExp(`^\\s*${escapeRegExp(buttonLabel)}\\s*$`, "i") });
+    const button = (await roleButton.count()) === 1 ? roleButton : textButton;
     if (await button.count() !== 1) throw new Error("kyc_document_button_not_found");
     const chooserPromise = page.waitForEvent("filechooser", { timeout: 10000 });
     await button.click();
@@ -95,6 +99,10 @@ async function mutate(job) {
     if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
     await parkKycPage(page);
   }
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function editField(page, job) {
