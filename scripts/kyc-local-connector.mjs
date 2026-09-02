@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
@@ -59,6 +60,55 @@ async function lookup(email) {
   } finally {
     await parkKycPage(page);
   }
+}
+
+const EDIT_TITLES = {
+  firstName: "Editar Nombre", paternalSurname: "Editar Apellido paterno", maternalSurname: "Editar Apellido materno",
+  email: "Editar Email", phone: "Editar Teléfono", dateOfBirth: "Editar Fecha de nacimiento", curp: "Editar CURP",
+  sex: "Editar Sexo", profession: "Editar Profesión", documentType: "Editar Tipo de documento", documentNumber: "Editar Número de documento",
+  street: "Editar Calle", exteriorNumber: "Editar Número exterior", neighborhood: "Editar Colonia", postalCode: "Editar Código postal",
+  municipality: "Editar Municipio", state: "Editar Estado"
+};
+const DOCUMENT_BUTTONS = { selfie: "Selfie", ineFront: "INE Frente", ineBack: "INE Vuelta", proofOfAddress: "Comp. Domicilio" };
+
+async function mutate(job) {
+  const page = await getKycPage();
+  if (!(await prepareKycPage(page))) throw new Error("kyc_login_required");
+  const tempDir = job.operation === "upload" ? await mkdtemp(path.join(process.env.TMPDIR || "/tmp", "betxico-kyc-")) : "";
+  try {
+    await page.goto(`${KYC_BASE_URL}/dashboard/users/${encodeURIComponent(job.userId)}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(500);
+    if (job.operation === "edit") return await editField(page, job);
+    const file = job.document?.file;
+    if (!file?.dataBase64) throw new Error("kyc_document_missing");
+    const filePath = path.join(tempDir, file.filename || "documento");
+    await writeFile(filePath, Buffer.from(file.dataBase64, "base64"));
+    const button = page.getByRole("button", { name: DOCUMENT_BUTTONS[job.document.type], exact: true });
+    if (await button.count() !== 1) throw new Error("kyc_document_button_not_found");
+    const chooserPromise = page.waitForEvent("filechooser", { timeout: 10000 });
+    await button.click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(filePath);
+    await page.waitForTimeout(1500);
+    return { operation: "upload", documentType: job.document.type, filename: file.filename, status: "uploaded" };
+  } finally {
+    if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    await parkKycPage(page);
+  }
+}
+
+async function editField(page, job) {
+  const title = EDIT_TITLES[job.field];
+  if (!title) throw new Error("invalid_kyc_field");
+  const editButton = page.getByTitle(title);
+  if (await editButton.count() !== 1) throw new Error("kyc_edit_button_not_found");
+  await editButton.click();
+  const input = page.locator(`input[aria-label="${title}"]`);
+  if (await input.count() !== 1) throw new Error("kyc_edit_input_not_found");
+  await input.fill(job.value);
+  await page.getByTitle("Guardar").click();
+  await page.waitForTimeout(1000);
+  return { operation: "edit", field: job.field, status: "updated" };
 }
 
 async function apiGet(page, pathname) {
@@ -164,7 +214,7 @@ async function pollBridge() {
       claimJob: () => bridgeRequest("claim", {}),
       lookupJob: async (job) => {
         console.log("LiveChat KYC query received.");
-        return lookupWithRetry(job);
+        return job.operation ? mutate(job) : lookupWithRetry(job);
       },
       completeJob: ({ jobId, result, error }) => bridgeRequest("complete", { jobId, result, error })
     });

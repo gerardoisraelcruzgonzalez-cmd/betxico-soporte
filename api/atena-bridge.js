@@ -4,7 +4,8 @@ import { requireAgentCapability } from "../lib/tool-access.js";
 import { isSupportAdmin } from "../lib/remote-config.js";
 import { authenticateConnectorAgent } from "../lib/connector-agent-auth.js";
 import { canReadAtenaJob, claimAtenaJob, completeAtenaJob, createAtenaJob, getJob } from "../lib/atena-bridge-store.js";
-import { canReadKycJob, claimKycJob, completeKycJob, createKycJob, getKycJob } from "../lib/kyc-bridge-store.js";
+import { canReadKycJob, claimKycJob, completeKycJob, createKycJob, createKycMutationJob, getKycJob } from "../lib/kyc-bridge-store.js";
+import { publicAttachmentMetadata, validateSupportAttachments } from "../lib/attachment-policy.js";
 import { beginBobJiraTicket, claimBobJob, completeBobJob, createBobJob, finishBobJiraTicket, getBobJob, listBobJobs, recordBobJobCheckpoint, scheduleBobJobRetry, updateBobJobCustomer, updateBobJobProgress } from "../lib/bob-bridge-store.js";
 import { createBobClosureJiraTicket, summarizeBobJiraError } from "../lib/bob-jira-ticket.js";
 import { processCompletedAtenaEvidence } from "../lib/case-evidence-auto-response.js";
@@ -94,19 +95,46 @@ async function handleKyc(req, res, action) {
   if (action === "claim" || action === "complete") return await handleKycConnector(req, res, action);
   requireWidgetAccess(req);
   const account = await requireCurrentAccount(req);
-  const body = await readJson(req);
+  const body = await readJson(req, { maxBytes: action === "mutate" ? 5 * 1024 * 1024 : undefined });
   if (action === "request") {
     await requireAgentCapability(account, "kyc");
     const email = String(body.email || "").trim().toLowerCase();
     if (!validEmail(email)) throw Object.assign(new Error("invalid_query"), { statusCode: 400 });
     return sendJson(res, 202, { ok: true, job: await createKycJob({ ownerEmail: account.email, email }) });
   }
+  if (action === "mutate") {
+    await requireAgentCapability(account, "kyc");
+    const userId = String(body.userId || "").trim();
+    const operation = String(body.operation || "").trim();
+    if (!userId || !["edit", "upload"].includes(operation)) throw Object.assign(new Error("invalid_kyc_mutation"), { statusCode: 400 });
+    if (operation === "edit") {
+      const allowedFields = new Set(["firstName", "paternalSurname", "maternalSurname", "email", "phone", "dateOfBirth", "curp", "sex", "profession", "documentType", "documentNumber", "street", "exteriorNumber", "neighborhood", "postalCode", "municipality", "state"]);
+      const field = String(body.field || "").trim();
+      const value = String(body.value || "").trim();
+      if (!allowedFields.has(field) || !value || value.length > 240) throw Object.assign(new Error("invalid_kyc_field"), { statusCode: 400 });
+      return sendJson(res, 202, { ok: true, job: publicKycJob(await createKycMutationJob({ ownerEmail: account.email, userId, operation, field, value })) });
+    }
+    const files = validateSupportAttachments(body.attachments || []);
+    if (files.length !== 1) throw Object.assign(new Error("kyc_one_document_required"), { statusCode: 400 });
+    const documentType = String(body.documentType || "").trim();
+    if (!["selfie", "ineFront", "ineBack", "proofOfAddress"].includes(documentType)) throw Object.assign(new Error("invalid_kyc_document_type"), { statusCode: 400 });
+    return sendJson(res, 202, { ok: true, job: publicKycJob(await createKycMutationJob({ ownerEmail: account.email, userId, operation, document: { type: documentType, file: files[0], metadata: publicAttachmentMetadata(files[0]) } })) });
+  }
   if (action === "result") {
     const job = await getKycJob(String(body.jobId || ""));
     if (!canReadKycJob(job, account.email)) throw Object.assign(new Error("kyc_job_not_found"), { statusCode: 404 });
-    return sendJson(res, 200, { ok: true, job });
+    return sendJson(res, 200, { ok: true, job: publicKycJob(job) });
   }
   return sendJson(res, 404, { ok: false, error: "kyc_bridge_action_not_found" });
+}
+
+function publicKycJob(job) {
+  if (!job) return null;
+  const { document, ...safeJob } = job;
+  return {
+    ...safeJob,
+    ...(document ? { document: { type: document.type, metadata: document.metadata || null } } : {})
+  };
 }
 
 async function handleConnector(req, res, action) {

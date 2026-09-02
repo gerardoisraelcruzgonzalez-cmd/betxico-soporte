@@ -46,7 +46,8 @@ Las imágenes se muestran como miniaturas. Al seleccionarlas se abre un visor y 
 
 ## Límites de seguridad
 
-- El conector sólo usa solicitudes `GET` y no ejecuta aprobaciones, rechazos, bloqueos, eliminaciones ni reemplazos de documentos.
+- Las consultas usan solicitudes `GET`. Las operaciones supervisadas de LiveChat se encolan y el conector local autenticado puede editar campos personales o subir/reemplazar un documento seleccionado. No ejecuta aprobaciones, rechazos, bloqueos, eliminaciones ni reinicios de verificación.
+- Cada escritura requiere un usuario KYC explícito, un campo permitido o un tipo de documento permitido; el contenido del archivo se valida por MIME, firma y tamaño antes de entrar a la cola.
 - Mientras no haya una consulta pendiente, el conector sólo revisa la cola privada de LiveChat y no llama a ninguna ruta de Paybridge KYC.
 - Al arrancar estaciona la ventana en `about:blank`; la sesión autorizada permanece guardada, pero la página KYC no queda ejecutándose.
 - Después de cada consulta, vuelve automáticamente a la página en blanco para detener cualquier actualización interna del backoffice.

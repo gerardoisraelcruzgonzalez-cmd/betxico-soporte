@@ -448,7 +448,7 @@ function initialize() {
   elements.quickDepositBtn?.addEventListener("click", handleQuickDepositOpen);
   elements.quickIneBtn?.addEventListener("click", handleQuickIneOpen);
   elements.kycLookupBtn?.addEventListener("click", handleKycLookup);
-  elements.kycLookupResults?.addEventListener("click", handleKycDocumentClick);
+  elements.kycLookupResults?.addEventListener("click", handleKycResultAction);
   elements.kycDocumentCloseBtn?.addEventListener("click", closeKycDocument);
   elements.kycDocumentOverlay?.addEventListener("click", (event) => {
     if (event.target === elements.kycDocumentOverlay) closeKycDocument();
@@ -1388,6 +1388,7 @@ function renderKycSource(source, sourceKey) {
 
 function renderKycResult(result, index) {
   const personal = result?.personal || {};
+  const address = result?.address || {};
   const checks = result?.checks || {};
   const state = formatKycState(result?.status);
   const fields = [
@@ -1401,7 +1402,9 @@ function renderKycResult(result, index) {
     ["Sexo", personal.sex],
     ["Profesión", personal.profession],
     ["Tipo de documento", personal.documentType],
-    ["Número de documento", personal.documentNumber]
+    ["Número de documento", personal.documentNumber],
+    ["Calle", address.street], ["Número exterior", address.exteriorNumber], ["Colonia", address.neighborhood],
+    ["Código postal", address.postalCode], ["Municipio", address.municipality], ["Estado", address.state]
   ];
   const checkItems = [
     ["Selfie", checks.selfieVerified],
@@ -1432,8 +1435,84 @@ function renderKycResult(result, index) {
         <div class="kyc-documents-heading"><b>Documentos</b><span>Haz clic para revisar legibilidad</span></div>
         <div class="kyc-document-grid">${documents}</div>
       </section>
+      <section class="kyc-livechat-actions" data-kyc-user-id="${escapeHtml(result?.id || "")}">
+        <b>Editar en KYC</b>
+        <div class="kyc-livechat-edit-actions">
+          ${fields.filter(([, value]) => value !== undefined && value !== null).map(([label, value]) => {
+            const field = KYC_EDIT_FIELD_BY_LABEL[label];
+            return field ? `<button type="button" class="kyc-mutation-edit" data-kyc-field="${field}" data-kyc-value="${escapeHtml(value || "")}">${escapeHtml(label)}</button>` : "";
+          }).join("")}
+        </div>
+        <div class="kyc-livechat-upload-actions">
+          ${Object.entries(KYC_DOCUMENT_LABELS).map(([type, label]) => `<button type="button" class="kyc-mutation-upload" data-kyc-document="${type}">${label}</button>`).join("")}
+        </div>
+        <small class="kyc-mutation-status" aria-live="polite"></small>
+      </section>
       ${profileLink}
     </article>`;
+}
+
+const KYC_EDIT_FIELD_BY_LABEL = {
+  "Nombre": "firstName", "Apellido paterno": "paternalSurname", "Apellido materno": "maternalSurname", Email: "email", Teléfono: "phone",
+  "Fecha de nacimiento": "dateOfBirth", CURP: "curp", Sexo: "sex", "Profesión": "profession", "Tipo de documento": "documentType",
+  "Número de documento": "documentNumber", "Calle": "street", "Número exterior": "exteriorNumber", Colonia: "neighborhood",
+  "Código postal": "postalCode", Municipio: "municipality", Estado: "state"
+};
+const KYC_DOCUMENT_LABELS = { selfie: "Selfie", ineFront: "INE Frente", ineBack: "INE Vuelta", proofOfAddress: "Comprobante" };
+
+async function handleKycResultAction(event) {
+  const edit = event.target.closest(".kyc-mutation-edit");
+  const upload = event.target.closest(".kyc-mutation-upload");
+  if (!edit && !upload) {
+    handleKycDocumentClick(event);
+    return;
+  }
+  const container = event.target.closest("[data-kyc-user-id]");
+  const userId = String(container?.dataset.kycUserId || "").trim();
+  const status = container?.querySelector(".kyc-mutation-status");
+  if (!userId) return;
+  if (edit) {
+    const current = edit.dataset.kycValue || "";
+    const value = window.prompt(`Nuevo valor para ${edit.textContent}:`, current);
+    if (value === null || !value.trim() || value.trim() === current) return;
+    await submitKycMutation({ userId, operation: "edit", field: edit.dataset.kycField, value: value.trim(), status });
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/webp,application/pdf";
+  input.hidden = true;
+  document.body.append(input);
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    try {
+      const compact = await compactIneAttachmentForTransport(file);
+      await submitKycMutation({
+        userId, operation: "upload", documentType: upload.dataset.kycDocument,
+        attachments: [{ filename: compact.name, contentType: compact.type || "application/octet-stream", dataBase64: await fileToBase64(compact) }], status
+      });
+    } catch (error) {
+      if (status) status.textContent = `No se pudo preparar el archivo: ${formatError(error.message)}`;
+    }
+  }, { once: true });
+  input.click();
+}
+
+async function submitKycMutation(payload) {
+  const { status, ...requestPayload } = payload;
+  if (status) status.textContent = "Enviando a la cola KYC...";
+  try {
+    const request = await fetchJson("/api/atena-bridge?service=kyc&action=mutate", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(requestPayload)
+    });
+    const job = await waitForKycBridgeResult(request.job?.id);
+    if (status) status.textContent = job.result?.status === "uploaded" ? "Documento cargado en KYC." : "Dato actualizado en KYC.";
+    await handleKycLookup();
+  } catch (error) {
+    if (status) status.textContent = `No se pudo completar: ${formatError(error.message)}`;
+  }
 }
 
 function renderKycDocument(document) {
