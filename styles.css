@@ -6871,6 +6871,11 @@ a.customer-auto-result:hover {
 .kyc-livechat-edit-actions, .kyc-livechat-upload-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .kyc-inline-edit { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 6px; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .kyc-inline-edit > span:last-child { color: #638cc1; font-size: 13px; opacity: .75; }
+.kyc-inline-editor { display: flex; width: 100%; align-items: center; gap: 4px; }
+.kyc-inline-editor input { min-width: 0; width: 100%; border: 1px solid #638cc1; border-radius: 4px; padding: 3px 5px; font: inherit; color: #24364f; }
+.kyc-inline-editor button { border: 0; background: transparent; padding: 2px 4px; cursor: pointer; font-size: 14px; }
+.kyc-inline-save { color: #16834b; }
+.kyc-inline-cancel { color: #9b3d3d; }
 .kyc-editable-field:hover { outline: 1px solid #9dbde5; outline-offset: 1px; border-radius: 5px; }
 .kyc-livechat-actions button { border: 1px solid #b8c7dc; background: #fff; color: #24466f; border-radius: 5px; padding: 5px 8px; font-size: 11px; cursor: pointer; }
 .kyc-livechat-actions button:hover { background: #eef5ff; border-color: #638cc1; }

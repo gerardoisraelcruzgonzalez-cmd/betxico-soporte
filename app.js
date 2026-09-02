@@ -1461,6 +1461,29 @@ const KYC_EDIT_FIELD_BY_LABEL = {
 const KYC_DOCUMENT_LABELS = { selfie: "Selfie", ineFront: "INE Frente", ineBack: "INE Vuelta", proofOfAddress: "Comprobante" };
 
 async function handleKycResultAction(event) {
+  const save = event.target.closest(".kyc-inline-save");
+  const cancel = event.target.closest(".kyc-inline-cancel");
+  if (save || cancel) {
+    const editor = event.target.closest(".kyc-inline-editor");
+    const fieldContainer = editor?.closest("dd");
+    if (!editor || !fieldContainer) return;
+    if (cancel) {
+      restoreKycInlineField(fieldContainer);
+      return;
+    }
+    const value = String(editor.querySelector("input")?.value || "").trim();
+    const current = String(fieldContainer.dataset.kycValue || "");
+    if (!value || value === current) {
+      restoreKycInlineField(fieldContainer);
+      return;
+    }
+    const status = fieldContainer.closest(".kyc-result-card")?.querySelector(".kyc-mutation-status");
+    await submitKycMutation({
+      userId: fieldContainer.closest("[data-kyc-user-id]")?.dataset.kycUserId,
+      operation: "edit", field: fieldContainer.dataset.kycField, value, status
+    });
+    return;
+  }
   const edit = event.target.closest(".kyc-inline-edit");
   const upload = event.target.closest(".kyc-mutation-upload");
   if (!edit && !upload) {
@@ -1473,9 +1496,19 @@ async function handleKycResultAction(event) {
   if (!userId) return;
   if (edit) {
     const current = edit.dataset.kycValue || "";
-    const value = window.prompt(`Nuevo valor para ${edit.dataset.kycLabel || "este campo"}:`, current);
-    if (value === null || !value.trim() || value.trim() === current) return;
-    await submitKycMutation({ userId, operation: "edit", field: edit.dataset.kycField, value: value.trim(), status });
+    const fieldContainer = edit.closest("dd");
+    if (!fieldContainer) return;
+    fieldContainer.dataset.kycField = edit.dataset.kycField || "";
+    fieldContainer.dataset.kycValue = current;
+    fieldContainer.dataset.kycLabel = edit.dataset.kycLabel || "este campo";
+    fieldContainer.innerHTML = `<span class="kyc-inline-editor"><input type="text" value="${escapeHtml(current)}" aria-label="${escapeHtml(edit.dataset.kycLabel || "Editar campo")}" maxlength="240"><button type="button" class="kyc-inline-save" title="Guardar" aria-label="Guardar">✓</button><button type="button" class="kyc-inline-cancel" title="Cancelar" aria-label="Cancelar">×</button></span>`;
+    const input = fieldContainer.querySelector("input");
+    input?.focus();
+    input?.select();
+    input?.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key === "Enter") fieldContainer.querySelector(".kyc-inline-save")?.click();
+      if (keyEvent.key === "Escape") fieldContainer.querySelector(".kyc-inline-cancel")?.click();
+    });
     return;
   }
   const input = document.createElement("input");
@@ -1498,6 +1531,13 @@ async function handleKycResultAction(event) {
     }
   }, { once: true });
   input.click();
+}
+
+function restoreKycInlineField(fieldContainer) {
+  const value = fieldContainer.dataset.kycValue || "";
+  const label = fieldContainer.dataset.kycLabel || "Editar campo";
+  const field = fieldContainer.dataset.kycField || "";
+  fieldContainer.innerHTML = `<button type="button" class="kyc-inline-edit" data-kyc-field="${escapeHtml(field)}" data-kyc-label="${escapeHtml(label)}" data-kyc-value="${escapeHtml(value)}"><span>${escapeHtml(value || "—")}</span><span aria-hidden="true">✎</span></button>`;
 }
 
 async function submitKycMutation(payload) {
